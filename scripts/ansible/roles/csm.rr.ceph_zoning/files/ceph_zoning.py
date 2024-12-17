@@ -32,7 +32,7 @@ import re
 import sys
 
 
-def create_and_map_racks():
+def create_and_map_racks(positions_dict):
     #Create buckets for racks and add them to the hierarchy under root=default
     for racknum, (rack, nodes) in enumerate(positions_dict.items()):
         racknum = "rack" + str(racknum+1)
@@ -99,7 +99,7 @@ def main():
     positions_dict = json.loads(positions)
 
     # Create buckets for rack and map hosts to racks
-    create_and_map_racks()
+    create_and_map_racks(positions_dict)
     # Create CRUSH rule and apply it to pools
     create_and_apply_rules()
 
