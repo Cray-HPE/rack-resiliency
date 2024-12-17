@@ -32,7 +32,7 @@
 - name: Perform CEPH zoning
   script: ceph_zoning.py /tmp/rack_placement.json
   args:
-    executable: python
+    executable: python3
   when: placement_file.stat.exists
   register: ceph_zoning_output
   delegate_to: "{{ play_hosts | first }}"
