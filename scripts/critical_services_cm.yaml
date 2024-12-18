@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: critical-services
+  namespace: rack-resiliency
+data:
+  critical-service-config.json: |-
+    {
+      "critical-services": {
+         "nexus": {
+           "namespace": "nexus",
+           "replicas": 1,
+           "type": "Deployment"
+         },
+         "cray-keycloak": {
+           "namespace": "services",
+           "replicas": 3,
+           "type": "StatefulSet"
+         },
+         "kube-proxy": {
+           "namespace": "kube-system",
+           "replicas": 8,
+           "type": "DaemonSet"
+         }
+      },
+      "Monitoring-Delay": 30
+    }
