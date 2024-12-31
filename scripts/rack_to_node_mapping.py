@@ -63,8 +63,10 @@ def rack_info(hsm_response, sls_response):
                     aliases = sls_entry["ExtraProperties"]["Aliases"][0]
                     res_rack[rack_id].append(aliases)
         res_rack = json.dumps(res_rack, indent=4)
-        #res_rack = res_rack.replace('"', '')
         print(res_rack)
+        # Redirecting the result to the tmp file
+        with open("/tmp/rack_info.txt", "w") as file:
+            file.write(res_rack + "\n")
     else:
         print(f"Failed to access the endpoint. Status code: {response.status_code}")
         print("Response text:", response.text)
