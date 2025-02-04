@@ -22,24 +22,20 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 ---
-# Apply CEPH zoning to make sure CEPH data gets replicated at rack level, 
-# so that there would not be data loss incase of a rack failure.
-- name: Check for mgmt nodes placement discovery file
-  stat:
-    path: "/tmp/rack_placement.json"
-  register: placement_file
 
-- name: Apply CEPH zoning
-  script: ceph_zoning.py /tmp/rack_placement.json
+# Discover physical racks and their mapping with respective management nodes
+# placement from HSM/ SLS 
+# 
+- name: Discover racks and corresponding management nodes placement
+  script: rack_to_node_mapping.py
   args:
     executable: python3
-  when: placement_file.stat.exists
-  register: ceph_zoning_result
+  register: mgmt_nodes_discovery
   delegate_to: "{{ play_hosts | first }}"
   run_once: true
-  changed_when: ceph_zoning_result.rc == 0
+  changed_when: mgmt_nodes_discovery.rc == 0
 
-# Remove this debug task from final source
-- name: CEPH zoning result
+  # Remove this debug task from the final source
+- name: Management nodes discovery results
   debug:
-    msg: "{{ ceph_zoning_result.stdout }}"
+    msg: "{{ mgmt_nodes_discovery.stdout }}"

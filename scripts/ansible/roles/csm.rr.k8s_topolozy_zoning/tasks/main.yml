@@ -1,4 +1,3 @@
-#!/usr/bin/env ansible-playbook
 #
 # MIT License
 #
@@ -22,19 +21,17 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-- hosts: Management_Master
-  gather_facts: no
-  any_errors_fatal: true
-  remote_user: root
-  roles:
-    #Perform placement discovery
-    #- role: csm.rr.mgmt_nodes_placement_discovery
-    #Perform placement validation
-    #- role: csm.rr.placement_validation
-    #  register: validation_result
-    #Perform k8s zoning
-    #- role: csm.rr.k8s_topolozy_zoning
-    #  when: validation_result.rc == 0
-    #Perform CEPH zoning
-    - role: csm.rr.ceph_zoning
-    # when: validation_result.rc == 0
+---
+- name: Apply k8s topology zoning for Master and Worker nodes
+  script: create_k8s_zones.py
+  args:
+    executable: python3
+  register: k8s_topology_zoning
+  delegate_to: "{{ play_hosts | first }}"
+  run_once: true
+  changed_when: k8s_topology_zoning.rc == 0
+
+# Remove this debug task from final source
+- name: k8s zoning output
+  debug:
+    msg: "{{ k8s_topology_zoning.stdout }}"

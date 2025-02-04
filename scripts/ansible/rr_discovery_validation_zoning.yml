@@ -1,3 +1,4 @@
+#!/usr/bin/env ansible-playbook
 #
 # MIT License
 #
@@ -21,25 +22,20 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
----
-# Apply CEPH zoning to make sure CEPH data gets replicated at rack level, 
-# so that there would not be data loss incase of a rack failure.
-- name: Check for mgmt nodes placement discovery file
-  stat:
-    path: "/tmp/rack_placement.json"
-  register: placement_file
 
-- name: Apply CEPH zoning
-  script: ceph_zoning.py /tmp/rack_placement.json
-  args:
-    executable: python3
-  when: placement_file.stat.exists
-  register: ceph_zoning_result
-  delegate_to: "{{ play_hosts | first }}"
-  run_once: true
-  changed_when: ceph_zoning_result.rc == 0
-
-# Remove this debug task from final source
-- name: CEPH zoning result
-  debug:
-    msg: "{{ ceph_zoning_result.stdout }}"
+# Rack Resiliency: Discover racks and corresponding managment nodes, validae
+# their placement. If condition is met then apply zoning(k8s topology and CEPH)
+# across racks.
+- hosts: Management_Master
+  gather_facts: no
+  any_errors_fatal: true
+  remote_user: root
+  roles:
+    #Perform placement discovery
+    - role: csm.rr.mgmt_nodes_placement_discovery
+    #Perform placement validation
+    - role: csm.rr.mgmt_nodes_placement_validation
+    #Perform k8s zoning
+    - role: csm.rr.k8s_topolozy_zoning
+    #Perform CEPH zoning
+    - role: csm.rr.ceph_zoning

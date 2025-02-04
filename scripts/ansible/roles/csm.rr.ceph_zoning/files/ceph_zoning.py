@@ -96,12 +96,12 @@ def main():
         positions = file.read()
     #positions = '{"x3000":["ncn-m001","ncn-w001","ncn-w004","ncn-w007","ncn-s001"],"x3001":["ncn-m002","ncn-w002","ncn-w006","ncn-s003"],"x3002":["ncn-m003","ncn-w003","ncn-w009","ncn-b005","ncn-s002"]}'
     print(positions)
-    positions_dict = json.loads(positions)
+    #positions_dict = json.loads(positions)
 
     # Create buckets for rack and map hosts to racks
-    create_and_map_racks(positions_dict)
+    #create_and_map_racks(positions_dict)
     # Create CRUSH rule and apply it to pools
-    create_and_apply_rules()
+    #create_and_apply_rules()
 
 if __name__ == "__main__":
     main()
