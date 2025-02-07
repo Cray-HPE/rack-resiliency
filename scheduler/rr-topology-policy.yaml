@@ -1,0 +1,40 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: insert-labels-topology-constraints
+  annotations:
+    policies.kyverno.io/title: Add Pod topology constraints
+    policies.kyverno.io/subject: Deployment
+    policies.kyverno.io/minversion: 1.6.0
+spec:
+  rules:
+    - name: insert-rack-res-label
+      match:
+        any:
+        - resources:
+            names:
+            - nexus
+            - cray-hbtd
+            - rre-deployment
+            - rre-deployment-a
+            kinds:
+            - Deployment
+            - StatefulSet
+      # Mutates the Deployment resource to add fields.
+      mutate:
+        patchStrategicMerge:
+          spec:
+            template:
+              metadata:
+                labels:
+                  rrflag: "rr-{{ request.object.metadata.name }}"
+              spec:
+                # Add the `topologySpreadConstraint`if not already specified.
+                +(topologySpreadConstraints):
+                - topologyKey: topology.kubernetes.io/zone
+                  whenUnsatisfiable: DoNotSchedule
+                  maxSkew: 1
+                  labelSelector:
+                    matchLabels:
+                      rrflag: "rr-{{ request.object.metadata.name }}"
+
