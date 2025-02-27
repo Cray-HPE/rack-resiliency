@@ -1,43 +1,65 @@
 import json
-import rados
+# import rados
+import subprocess
+# def get_ceph_details():
+#     """Fetch Ceph OSD tree details using rados."""
+#     try:
+#         cluster = rados.Rados(conffile="/etc/ceph/ceph.conf")
+#         cluster.conf_set('keyring', '/etc/ceph/ceph.client.admin.keyring')
+#         cluster.connect()
+
+#         cmd = json.dumps({"prefix": "osd tree", "format": "json-pretty"})
+#         result = cluster.mon_command(cmd, b'')
+#         cluster.shutdown()
+
+#         if isinstance(result, tuple) and len(result) >= 2:
+#             json_data = result[1].decode()
+#         else:
+#             raise ValueError(f"Unexpected return format: {result}")
+
+#         return json.loads(json_data)
+#     except Exception as e:
+#         return {"error": str(e)}
+
+# def get_ceph_hosts():
+#     """Fetch Ceph storage node statuses using rados."""
+#     try:
+#         cluster = rados.Rados(conffile="/etc/ceph/ceph.conf")
+#         cluster.conf_set('keyring', '/etc/ceph/ceph.client.admin.keyring')
+#         cluster.connect()
+
+#         cmd = json.dumps({"prefix": "orch host ls", "format": "json-pretty"})
+#         result = cluster.mon_command(cmd, b'')
+#         cluster.shutdown()
+
+#         if isinstance(result, tuple) and len(result) >= 2:
+#             json_data = result[1].decode()
+#         else:
+#             raise ValueError(f"Unexpected return format: {result}")
+
+#         return json.loads(json_data)
+#     except Exception as e:
+#         return {"error": str(e)}
 
 def get_ceph_details():
-    """Fetch Ceph OSD tree details using rados."""
+    host = 'ncn-m001'
+    cmd = f"ssh {host} 'ceph osd tree -f json-pretty'"
     try:
-        cluster = rados.Rados(conffile="/etc/ceph/ceph.conf")
-        cluster.conf_set('keyring', '/etc/ceph/ceph.client.admin.keyring')
-        cluster.connect()
-
-        cmd = json.dumps({"prefix": "osd tree", "format": "json-pretty"})
-        result = cluster.mon_command(cmd, b'')
-        cluster.shutdown()
-
-        if isinstance(result, tuple) and len(result) >= 2:
-            json_data = result[1].decode()
-        else:
-            raise ValueError(f"Unexpected return format: {result}")
-
-        return json.loads(json_data)
+        result = subprocess.run(cmd,shell=True,check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True,)
+        if result.returncode != 0:
+            raise ValueError(f"Error fetching Ceph details: {result.stderr}")
+        return json.loads(result.stdout)
     except Exception as e:
         return {"error": str(e)}
 
 def get_ceph_hosts():
-    """Fetch Ceph storage node statuses using rados."""
+    host = 'ncn-m001'
+    cmd = f"ssh {host} 'ceph orch host ls -f json-pretty'"
     try:
-        cluster = rados.Rados(conffile="/etc/ceph/ceph.conf")
-        cluster.conf_set('keyring', '/etc/ceph/ceph.client.admin.keyring')
-        cluster.connect()
-
-        cmd = json.dumps({"prefix": "orch host ls", "format": "json-pretty"})
-        result = cluster.mon_command(cmd, b'')
-        cluster.shutdown()
-
-        if isinstance(result, tuple) and len(result) >= 2:
-            json_data = result[1].decode()
-        else:
-            raise ValueError(f"Unexpected return format: {result}")
-
-        return json.loads(json_data)
+        result = subprocess.run(cmd,shell=True,check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True,)
+        if result.returncode != 0:
+            raise ValueError(f"Error fetching Ceph details: {result.stderr}")
+        return json.loads(result.stdout)
     except Exception as e:
         return {"error": str(e)}
 
