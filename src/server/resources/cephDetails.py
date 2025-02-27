@@ -1,0 +1,85 @@
+import json
+import rados
+
+def get_ceph_details():
+    """Fetch Ceph OSD tree details using rados."""
+    try:
+        cluster = rados.Rados(conffile="/etc/ceph/ceph.conf")
+        cluster.conf_set('keyring', '/etc/ceph/ceph.client.admin.keyring')
+        cluster.connect()
+
+        cmd = json.dumps({"prefix": "osd tree", "format": "json-pretty"})
+        result = cluster.mon_command(cmd, b'')
+        cluster.shutdown()
+
+        if isinstance(result, tuple) and len(result) >= 2:
+            json_data = result[1].decode()
+        else:
+            raise ValueError(f"Unexpected return format: {result}")
+
+        return json.loads(json_data)
+    except Exception as e:
+        return {"error": str(e)}
+
+def get_ceph_hosts():
+    """Fetch Ceph storage node statuses using rados."""
+    try:
+        cluster = rados.Rados(conffile="/etc/ceph/ceph.conf")
+        cluster.conf_set('keyring', '/etc/ceph/ceph.client.admin.keyring')
+        cluster.connect()
+
+        cmd = json.dumps({"prefix": "orch host ls", "format": "json-pretty"})
+        result = cluster.mon_command(cmd, b'')
+        cluster.shutdown()
+
+        if isinstance(result, tuple) and len(result) >= 2:
+            json_data = result[1].decode()
+        else:
+            raise ValueError(f"Unexpected return format: {result}")
+
+        return json.loads(json_data)
+    except Exception as e:
+        return {"error": str(e)}
+
+def get_ceph_storage_nodes():
+    """Fetch Ceph storage nodes and their OSD statuses."""
+    ceph_tree = get_ceph_details()
+    ceph_hosts = get_ceph_hosts()
+
+    if isinstance(ceph_tree, dict) and "error" in ceph_tree:
+        return {"error": ceph_tree["error"]}
+    
+    if isinstance(ceph_hosts, dict) and "error" in ceph_hosts:
+        return {"error": ceph_hosts["error"]}
+
+    host_status_map = {host["hostname"]: host["status"] for host in ceph_hosts}
+
+    zones = {}
+
+    for item in ceph_tree.get('nodes', []):
+        if item['type'] == 'rack':  # Zone (Rack)
+            rack_name = item['name']
+            storage_nodes = []
+
+            for child_id in item.get('children', []):
+                host_node = next((x for x in ceph_tree['nodes'] if x['id'] == child_id), None)
+
+                if host_node and host_node['type'] == 'host' and host_node['name'].startswith("ncn-s"):
+                    osd_ids = host_node.get('children', [])
+                    
+                    osds = [osd for osd in ceph_tree['nodes'] if osd['id'] in osd_ids and osd['type'] == 'osd']
+                    osd_status_list = [{"name": osd['name'], "status": osd.get('status', 'unknown')} for osd in osds]
+
+                    node_status = host_status_map.get(host_node['name'], "No Status")
+                    if node_status in ["", "online"]:
+                        node_status = "Ready"
+
+                    storage_nodes.append({
+                        "name": host_node['name'],
+                        "status": node_status,
+                        "osds": osd_status_list
+                    })
+
+            zones[rack_name] = storage_nodes
+
+    return zones if zones else "No Ceph zones present"
