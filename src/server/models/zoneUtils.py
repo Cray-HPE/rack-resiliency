@@ -3,7 +3,7 @@ from resources.cephDetails import get_ceph_storage_nodes
 
 def zoneExist(k8s_zone_mapping, ceph_zones):
     if (type(k8s_zone_mapping) == str) and (type(ceph_zones) == str):
-        return {"Information": "No zones configured"}
+        return {"Information": "No zones(k8s topology and ceph) configured"}
     if type(k8s_zone_mapping) == str:
         return {"Information": "No K8s topology zones configured"}
     if type(ceph_zones) == str:

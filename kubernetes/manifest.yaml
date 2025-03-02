@@ -32,7 +32,7 @@ spec:
         - name: critical-svc
           mountPath: /etc/config
           subPath: critical-service-config.json
-          readOnly: true
+          readOnly: false
         - name: ssh-config
           mountPath: /etc/ssh
           readOnly: true
