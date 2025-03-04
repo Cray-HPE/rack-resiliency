@@ -2,6 +2,7 @@ apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
   name: rrs-vs
+  namespace: rack-resiliency
 spec:
   gateways:
   - services/services-gateway
@@ -11,7 +12,7 @@ spec:
   http:
   - match:
     - uri:
-        prefix: /apis/rrss/
+        prefix: /apis/rrs/
     rewrite:
       uri: /
     route:
