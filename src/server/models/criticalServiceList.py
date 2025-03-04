@@ -14,7 +14,7 @@ def get_critical_services():
             config_data = json.load(file)
             services = config_data.get("critical-services", {})
 
-            formatted_services = [
+            result = [
                 {
                     "name": name,
                     "namespace": details["namespace"],
@@ -23,7 +23,7 @@ def get_critical_services():
                 for name, details in services.items()
             ]
             
-            return formatted_services
+            return result
     except Exception as e:
         return {"error": str(e)}
 

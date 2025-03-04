@@ -1,11 +1,8 @@
 from flask import jsonify
-from resources.k8sDetails import get_k8s_nodes_data
-from resources.cephDetails import get_ceph_storage_nodes
-from models.zoneUtils import zoneExist
+from resources.k8sZones import get_k8s_nodes_data
+from resources.cephZones import get_ceph_storage_nodes
+from models.zoneList import zoneExist
 
-# zone_desc_bp = Blueprint('zone_desc', __name__)
-
-# @zone_desc_bp.route('/zones/<zone_name>', methods=['GET'])
 def describe_zone(zone_name):
     """Endpoint to get detailed information of a specific zone."""
     k8s_zone_mapping = get_k8s_nodes_data()

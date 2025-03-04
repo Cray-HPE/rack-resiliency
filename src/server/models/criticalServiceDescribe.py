@@ -1,7 +1,7 @@
 import os
 import json
 from flask import jsonify
-from resources.k8sDetails import get_pods, get_services
+from resources.k8sZones import get_pods, get_services
 
 CRITICAL_SERVICE_CONFIG_PATH = "/etc/config"
 
