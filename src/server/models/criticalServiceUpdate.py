@@ -34,12 +34,11 @@ def update_configmap(new_data):
         body = {"data": {CONFIGMAP_KEY: updated_json_str}}
         v1.patch_namespaced_config_map(CONFIGMAP_NAME, CONFIGMAP_NAMESPACE, body)
 
-        # return {"message": "ConfigMap updated successfully", "updated_data": existing_services}
         return {
             "message": "Update successful",
             "added_services": added_services,
-            "skipped_services": skipped_services
-        }, 200
+            "already_existing_services": skipped_services
+        }
 
     except client.exceptions.ApiException as e:
         return {"error": f"Failed to update ConfigMap: {e}"}
@@ -48,14 +47,13 @@ def update_critical_services(new_data):
     """Endpoint to update critical services in the ConfigMap."""
     try:
         # Extract JSON payload from request
-        new_data = request.get_json()
-        if not new_data or "new" not in new_data or "services" not in new_data["new"]:
+        # new_data = request.get_json()
+        if not new_data or "new_services" not in new_data:
             return jsonify({"error": "Invalid request format"}), 400
 
         # Parse the nested JSON string inside "services"
         try:
-            new_data = new_data.get("new")
-            new_data = new_data.get("services")
+            new_data = new_data.get("new_services")
             new_services = json.loads(new_data)
         except json.JSONDecodeError:
             return jsonify({"error": "Invalid JSON format in services"}), 400

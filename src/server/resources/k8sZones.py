@@ -16,24 +16,6 @@ def get_k8s_nodes():
     except Exception as e:
         return {"error": str(e)}
 
-def get_pods(namespace):
-    """Retrieve all Kubernetes nodes."""
-    try:
-        load_k8s_config()
-        v1 = client.CoreV1Api()
-        return v1.list_namespaced_pod(namespace)
-    except Exception as e:
-        return {"error": str(e)}
-
-def get_services(namespace):
-    """Retrieve all Kubernetes nodes."""
-    try:
-        load_k8s_config()
-        v1 = client.CoreV1Api()
-        return v1.list_namespaced_service(namespace)
-    except Exception as e:
-        return {"error": str(e)}
-
 def get_k8s_nodes_data():
     """Fetch Kubernetes nodes and organize them by topology zone."""
     nodes = get_k8s_nodes()

@@ -4,6 +4,7 @@ from models.zoneDescribe import describe_zone
 from models.criticalServiceList import get_critical_service_list
 from models.criticalServiceDescribe import describe_service
 from models.criticalServiceUpdate import update_critical_services
+
 app = Flask(__name__)
 
 @app.route("/zones", methods=["GET"])
