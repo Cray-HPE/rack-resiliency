@@ -1,3 +1,4 @@
+name: cray-rrs-api
 department: rack-resiliency
 replicaCount: 1
 image:
@@ -5,7 +6,7 @@ image:
   tag: "1.1"
   pullPolicy: Never
 service:
-  name: k8s-zone-api
+  name: cray-rrs-api
   type: ClusterIP
   port: 80
   targetPort: 80
@@ -15,6 +16,10 @@ volumes:
   cephConfigName: ceph-admin-config
   criticalSvcConfigName: rrs-map
 auth:
-  serviceAccount: k8s-zone-reader
-  clusterRole: k8s-zone-role
-  clusterRoleBinding: k8s-zone-rolebinding
+  serviceAccount: cray-rrs-reader
+  clusterRole: cray-rrs-role
+  clusterRoleBinding: cray-rrs-rolebinding
+virtualservice:
+  name: cray-rrs-vs
+  prefix: /apis/rrs
+  
