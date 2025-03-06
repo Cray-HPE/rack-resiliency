@@ -65,8 +65,9 @@ import subprocess
 #     except Exception as e:
 #         return {"error": str(e)}
 
+host = 'ncn-m001'
 def get_ceph_details():
-    host = 'ncn-m001'
+    """Function to fetch the CEPH OSD details using ssh"""
     cmd = f"ssh {host} 'ceph osd tree -f json-pretty'"
     try:
         result = subprocess.run(cmd,shell=True,check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True,)
@@ -77,7 +78,7 @@ def get_ceph_details():
         return {"error": str(e)}
 
 def get_ceph_hosts():
-    host = 'ncn-m001'
+    """Function to fetch the hosts details using ssh"""
     cmd = f"ssh {host} 'ceph orch host ls -f json-pretty'"
     try:
         result = subprocess.run(cmd,shell=True,check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True,)

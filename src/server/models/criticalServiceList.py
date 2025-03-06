@@ -29,23 +29,21 @@ def get_critical_services():
     """Fetch and format critical services grouped by namespace in the required structure."""
     try:
         services = get_configmap().get("critical-services", {})
-
-        grouped_services = {"namespace": {}}
-
+        result = {"namespace": {}}
         for name, details in services.items():
             namespace = details["namespace"]
-            if namespace not in grouped_services["namespace"]:
-                grouped_services["namespace"][namespace] = []
-            grouped_services["namespace"][namespace].append({
+            if namespace not in result["namespace"]:
+                result["namespace"][namespace] = []
+            result["namespace"][namespace].append({
                 "name": name,
                 "type": details["type"]
             })
 
-        return grouped_services
+        return result
     except Exception as e:
         return {"error": str(e)}
 
 def get_critical_service_list():
-    """Endpoint to list critical services."""
+    """Returning the response in JSON Format"""
     return jsonify({"critical-services": get_critical_services()})
 

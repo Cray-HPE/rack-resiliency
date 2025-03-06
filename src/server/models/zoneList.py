@@ -27,6 +27,7 @@ from resources.cephZones import get_ceph_storage_nodes
 from flask import jsonify
 
 def zoneExist(k8s_zone_mapping, ceph_zones):
+    """Function to check if any types of zones(K8s Tpology or CEPH) exist"""
     if isinstance(k8s_zone_mapping, str) and isinstance(ceph_zones, str):
         return {"Information": "No zones(k8s topology and ceph) configured"}
     if isinstance(k8s_zone_mapping, str):

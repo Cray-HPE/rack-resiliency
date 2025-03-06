@@ -28,7 +28,7 @@ from resources.cephZones import get_ceph_storage_nodes
 from models.zoneList import zoneExist
 
 def describe_zone(zone_name):
-    """Endpoint to get detailed information of a specific zone."""
+    """Function to get detailed information of a specific zone."""
     k8s_zone_mapping = get_k8s_nodes_data()
     ceph_zones = get_ceph_storage_nodes()
 

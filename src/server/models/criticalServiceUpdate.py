@@ -28,6 +28,7 @@ from kubernetes import client
 from resources.criticalServices import *
 
 def serviceExist(service_name,new_services):
+    """Function to check if the service to be updated has any instances running on cluster"""
     try:
         service_info = new_services[service_name]
 
@@ -99,7 +100,7 @@ def update_configmap(new_data):
         return {"error": f"Failed to update ConfigMap: {e}"}
 
 def update_critical_services(new_data):
-    """Endpoint to update critical services in the ConfigMap."""
+    """Function to update critical services in the ConfigMap."""
     try:
         if not new_data or "new_services" not in new_data:
             return jsonify({"error": "Invalid request format"}), 400

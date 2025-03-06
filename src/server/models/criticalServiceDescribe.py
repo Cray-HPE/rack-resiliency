@@ -33,6 +33,7 @@ def get_service_details(service_name):
         if service_name not in services:
             return {"error": "Service not found"}
         
+        # Getting information of service
         service_info = services[service_name]
         namespace = service_info["namespace"]
         resource_type = service_info["type"]
@@ -59,12 +60,13 @@ def get_service_details(service_name):
                 "Namespace": namespace,
                 "Type": resource_type,
                 "Configured Instances": configured_instances,
-                "Currently Running Instances": running_pods,  # Running pod count
-                "Pods": filtered_pods  # Now includes both name and status
+                "Currently Running Instances": running_pods, 
+                "Pods": filtered_pods
             }
         }
     except Exception as e:
         return {"error": str(e)}
 
 def describe_service(service_name):
+    """Returning the response in JSON Format"""
     return jsonify(get_service_details(service_name))

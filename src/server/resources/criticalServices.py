@@ -26,12 +26,13 @@ from kubernetes import client, config
 from flask import json
 
 CONFIGMAP_NAME = "rrs-map"
-CONFIGMAP_NAMESPACE = "rack-resiliency"  # Change this to the namespace where your ConfigMap is deployed
+CONFIGMAP_NAMESPACE = "rack-resiliency"
 CONFIGMAP_KEY = "critical-service-config.json"
 
 config.load_incluster_config()
 
 def get_namespaced_pods(service_info, service_name):
+    """Fuction to fetch the pods in a namespace and number of instances using Kube-config"""
     namespace = service_info["namespace"]
     resource_type = service_info["type"]
     v1 = client.CoreV1Api()
@@ -57,8 +58,8 @@ def get_namespaced_pods(service_info, service_name):
     return result, running_pods, total_pods
 
 def get_namespaced_services(service_info, service_name):
+    """Fuction to fetch the services in a namespace and number of instances using Kube-config"""
     namespace = service_info["namespace"]
-    resource_type = service_info["type"]
     v1 = client.CoreV1Api()
 
     # Get all services in the namespace and filter by owner reference
@@ -73,9 +74,8 @@ def get_namespaced_services(service_info, service_name):
     return result
 
 def isDeploy(resource_type):
-     if(resource_type == "Deployment"):
-          return "ReplicaSet"
-     return resource_type
+    """To check if resource is Deployment"""
+    return "ReplicaSet" if resource_type == "Deployment" else resource_type
 
 
 def get_configmap():

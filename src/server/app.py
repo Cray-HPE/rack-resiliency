@@ -31,26 +31,32 @@ from models.criticalServiceUpdate import update_critical_services
 
 app = Flask(__name__)
 
+# Endpoint to get the list of zones
 @app.route("/zones", methods=["GET"])
 def listZones():
     return get_zones()
 
+# Endpoint to describe the zone entered
 @app.route('/zones/<zone_name>', methods=['GET'])
 def desc_zone(zone_name):
     return describe_zone(zone_name)
 
+# Endpoint to get the list of critical services
 @app.route('/criticalservices', methods=['GET'])
 def listCriticalService():
     return get_critical_service_list()
 
+# Endpoint to describe the critical service entered
 @app.route("/criticalservices/<service_name>", methods=["GET"])
 def describeCriticalService(service_name):
     return describe_service(service_name)
 
+# Endpoint to update the critical services list
 @app.route("/criticalservices", methods=["PATCH"])
 def updateCriticalService():
     new_data = request.get_json()
     return update_critical_services(new_data)
 
+# Running the Flask app
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=80, debug=True)
