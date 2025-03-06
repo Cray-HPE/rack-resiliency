@@ -1,3 +1,27 @@
+#
+# MIT License
+#
+# (C) Copyright [2024-2025] Hewlett Packard Enterprise Development LP
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included
+# in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+#
+
 import json
 from flask import jsonify
 from kubernetes import client
@@ -41,7 +65,7 @@ def update_configmap(new_data):
             if service_name in existing_services:
                 skipped_services.append(service_name)
             else:
-                if(serviceExist(service_name, new_services["critical-services"])):
+                if serviceExist(service_name, new_services["critical-services"]):
                     existing_services[service_name] = details
                     added_services.append(service_name)
                 else:
@@ -54,13 +78,22 @@ def update_configmap(new_data):
         body = {"data": {CONFIGMAP_KEY: updated_json_str}}
         v1.patch_namespaced_config_map(CONFIGMAP_NAME, CONFIGMAP_NAMESPACE, body)
 
-        return {
-            "Message": "Update successful",
-            "Added Services": added_services,
-            "Already Existing Services": skipped_services,
-            "Non-Existing Services": non_existing_services,
-            "Message for non-existing services": "Service has no associated pods in the namespace, Please verify the Information"
-        }
+        response = {"Update": "OK"}
+
+        if added_services:
+            response["Successfully Added Services"] = added_services
+        if skipped_services:
+            response["Already Existing Services"] = skipped_services
+        if non_existing_services:
+            response["Unknown Services"] = non_existing_services
+            response["Message for unknown services"] = (
+                "Service(s) has no associated pods in the namespace, Please verify the Information"
+            )
+
+        return response
+
+    except Exception as e:
+        return {"error": str(e)}
 
     except client.exceptions.ApiException as e:
         return {"error": f"Failed to update ConfigMap: {e}"}

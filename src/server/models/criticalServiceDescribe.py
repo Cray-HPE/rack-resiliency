@@ -1,3 +1,27 @@
+#
+# MIT License
+#
+# (C) Copyright [2024-2025] Hewlett Packard Enterprise Development LP
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included
+# in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+#
+
 from flask import jsonify
 from resources.criticalServices import *
 from kubernetes import client
@@ -16,9 +40,6 @@ def get_service_details(service_name):
         # Get all pods in the namespace and filter by owner reference
         filtered_pods, total_pods, running_pods = get_namespaced_pods(service_info, service_name)
 
-        # Get all services in the namespace and filter by label selector
-        filtered_services = get_namespaced_services(service_info, service_name)
-        
         # Get configured instances
         apps_v1 = client.AppsV1Api()
         configured_instances = None
@@ -34,14 +55,12 @@ def get_service_details(service_name):
 
         return {
             "Critical Service": {
-                "name": service_name,
-                "namespace": namespace,
-                "type": resource_type,
-                "configured_instances": configured_instances,
-                "currently_running_instances": running_pods,  # Running pod count
-                "total_pods": total_pods,
-                "pods": filtered_pods,  # Now includes both name and status
-                "services": filtered_services
+                "Name": service_name,
+                "Namespace": namespace,
+                "Type": resource_type,
+                "Configured Instances": configured_instances,
+                "Currently Running Instances": running_pods,  # Running pod count
+                "Pods": filtered_pods  # Now includes both name and status
             }
         }
     except Exception as e:

@@ -1,21 +1,42 @@
+#
+# MIT License
+#
+# (C) Copyright [2024-2025] Hewlett Packard Enterprise Development LP
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included
+# in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+#
+
 from resources.k8sZones import get_k8s_nodes_data
 from resources.cephZones import get_ceph_storage_nodes
 from flask import jsonify
 
 def zoneExist(k8s_zone_mapping, ceph_zones):
-    if (type(k8s_zone_mapping) == str) and (type(ceph_zones) == str):
+    if isinstance(k8s_zone_mapping, str) and isinstance(ceph_zones, str):
         return {"Information": "No zones(k8s topology and ceph) configured"}
-    if type(k8s_zone_mapping) == str:
+    if isinstance(k8s_zone_mapping, str):
         return {"Information": "No K8s topology zones configured"}
-    if type(ceph_zones) == str:
+    if isinstance(ceph_zones, str):
         return {"Information": "No CEPH zones configured"}
 
 def get_node_name(node_list):
-    names = []
-    if(len(node_list)>0):
-        for i in node_list:
-            names.append(i.get("name"))
-    return names
+    """Extracts node names from a list of node dictionaries."""
+    return [node.get("name") for node in node_list if "name" in node]
 
 def map_zones():
     """Map Kubernetes and Ceph zones and provide summarized data."""
@@ -28,7 +49,7 @@ def map_zones():
     if isinstance(ceph_zones, dict) and "error" in ceph_zones:
         return {"error": ceph_zones["error"]}
     
-    if (type(k8s_zone_mapping) == str) or (type(ceph_zones) == str):
+    if isinstance(k8s_zone_mapping, str) or isinstance(ceph_zones, str):
         return zoneExist(k8s_zone_mapping, ceph_zones)
     
     all_zone_names = set(k8s_zone_mapping.keys()) | set(ceph_zones.keys())
@@ -39,11 +60,25 @@ def map_zones():
         workers = get_node_name(k8s_zone_mapping.get(zone_name, {}).get("workers", []))
         storage = get_node_name(ceph_zones.get(zone_name, []))
 
-        result[zone_name] = {
-            "Management Master Nodes": masters,
-            "Management Worker Nodes": workers,
-            "Management Storage Nodes": storage
-        }
+        zone_data = {}
+        if masters:
+            zone_data["Management Master Nodes"] = {
+                "Zone Type": "Kubernetes Topology Zone",
+                "Nodes": masters
+            }
+        if workers:
+            zone_data["Management Worker Nodes"] = {
+                "Zone Type": "Kubernetes Topology Zone",
+                "Nodes": workers
+            }
+        if storage:
+            zone_data["Management Storage Nodes"] = {
+                "Zone Type": "Ceph Zone",
+                "Nodes": storage
+            }
+        
+        if zone_data:
+            result[zone_name] = zone_data
 
     return result
 
