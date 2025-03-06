@@ -1,7 +1,24 @@
 import json
-from flask import jsonify, request
+from flask import jsonify
 from kubernetes import client
-from resources.criticalServices import get_configmap, CONFIGMAP_KEY, CONFIGMAP_NAME, CONFIGMAP_NAMESPACE
+from resources.criticalServices import *
+
+def serviceExist(service_name,new_services):
+    try:
+        service_info = new_services[service_name]
+
+        # Get all pods in the namespace and filter by owner reference
+        filtered_pods = get_namespaced_pods(service_info, service_name)
+
+        # Get all services in the namespace and filter by label selector
+        filtered_services = get_namespaced_services(service_info, service_name)
+
+        if len(filtered_pods[0]) == 0 and len(filtered_services) == 0:
+            return False
+        return True
+    
+    except Exception as e:
+        return {"error": str(e)} 
 
 def update_configmap(new_data):
     """Update the ConfigMap in the Kubernetes cluster with the merged data."""
@@ -19,13 +36,16 @@ def update_configmap(new_data):
         # Merge new services, checking for duplicates
         added_services = []
         skipped_services = []
-
+        non_existing_services = []
         for service_name, details in new_services["critical-services"].items():
             if service_name in existing_services:
                 skipped_services.append(service_name)
             else:
-                existing_services[service_name] = details
-                added_services.append(service_name)
+                if(serviceExist(service_name, new_services["critical-services"])):
+                    existing_services[service_name] = details
+                    added_services.append(service_name)
+                else:
+                    non_existing_services.append(service_name)
 
         # Convert back to JSON string for ConfigMap storage
         updated_json_str = json.dumps({"critical-services": existing_services}, indent=2)
@@ -35,9 +55,11 @@ def update_configmap(new_data):
         v1.patch_namespaced_config_map(CONFIGMAP_NAME, CONFIGMAP_NAMESPACE, body)
 
         return {
-            "message": "Update successful",
-            "added_services": added_services,
-            "already_existing_services": skipped_services
+            "Message": "Update successful",
+            "Added Services": added_services,
+            "Already Existing Services": skipped_services,
+            "Non-Existing Services": non_existing_services,
+            "Message for non-existing services": "Service has no associated pods in the namespace, Please verify the Information"
         }
 
     except client.exceptions.ApiException as e:
@@ -46,8 +68,6 @@ def update_configmap(new_data):
 def update_critical_services(new_data):
     """Endpoint to update critical services in the ConfigMap."""
     try:
-        # Extract JSON payload from request
-        # new_data = request.get_json()
         if not new_data or "new_services" not in new_data:
             return jsonify({"error": "Invalid request format"}), 400
 

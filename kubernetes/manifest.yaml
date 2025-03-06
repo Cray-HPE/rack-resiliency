@@ -16,7 +16,7 @@ spec:
       serviceAccountName: k8s-zone-reader
       containers:
       - name: k8s-zone-api
-        image: library/cli:4.6
+        image: library/base:1.1
         imagePullPolicy: Never
         ports:
         - containerPort: 80
@@ -27,7 +27,7 @@ spec:
           mountPath: /var/run/secrets/kubernetes.io/serviceaccount
           readOnly: true
         - name: ceph-config
-          mountPath: /etc/ceph/
+          mountPath: /etc/ceph
           readOnly: true
         - name: critical-svc
           mountPath: /etc/config
@@ -95,9 +95,12 @@ metadata:
   name: k8s-zone-role
   namespace: rack-resiliency
 rules:
-- apiGroups: [""]
-  resources: ["nodes", "services"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "statefulsets", "daemonsets"]
   verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["nodes", "services", "pods", "configmaps"]
+  verbs: ["get", "list", "watch", "patch"]
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1

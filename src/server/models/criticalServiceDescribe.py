@@ -1,11 +1,6 @@
-from kubernetes import client, config
 from flask import jsonify
-from resources.criticalServices import get_configmap
-
-def isDeploy(resource_type):
-     if(resource_type == "Deployment"):
-          return "ReplicaSet"
-     return resource_type
+from resources.criticalServices import *
+from kubernetes import client
 
 def get_service_details(service_name):
     """Retrieve details of a specific critical service."""
@@ -18,40 +13,33 @@ def get_service_details(service_name):
         namespace = service_info["namespace"]
         resource_type = service_info["type"]
 
-        # Load Kubernetes config
-        config.load_incluster_config()
-
-        v1 = client.CoreV1Api()
-
         # Get all pods in the namespace and filter by owner reference
-        pod_list = v1.list_namespaced_pod(namespace)
-        filtered_pods = [
-            {
-                "name": pod.metadata.name,
-                "status": pod.status.phase  # Fetch the status of the pod
-            }
-            for pod in pod_list.items
-            if pod.metadata.owner_references and any(
-                owner.kind == isDeploy(resource_type) and owner.name.startswith(service_name)
-                for owner in pod.metadata.owner_references
-            )
-        ]
+        filtered_pods, total_pods, running_pods = get_namespaced_pods(service_info, service_name)
 
         # Get all services in the namespace and filter by label selector
-        svc_list = v1.list_namespaced_service(namespace)
-        filtered_services = [
-            svc.metadata.name for svc in svc_list.items
-            if svc.spec.selector and any(
-                key in svc.spec.selector and svc.spec.selector[key] == service_name
-                for key in svc.spec.selector
-            )
-        ]
+        filtered_services = get_namespaced_services(service_info, service_name)
+        
+        # Get configured instances
+        apps_v1 = client.AppsV1Api()
+        configured_instances = None
+        if resource_type == "Deployment":
+            deployment = apps_v1.read_namespaced_deployment(service_name, namespace)
+            configured_instances = deployment.spec.replicas
+        elif resource_type == "StatefulSet":
+            statefulset = apps_v1.read_namespaced_stateful_set(service_name, namespace)
+            configured_instances = statefulset.spec.replicas
+        elif resource_type == "DaemonSet":
+            daemonset = apps_v1.read_namespaced_daemon_set(service_name, namespace)
+            configured_instances = daemonset.status.desired_number_scheduled
 
         return {
             "Critical Service": {
                 "name": service_name,
                 "namespace": namespace,
                 "type": resource_type,
+                "configured_instances": configured_instances,
+                "currently_running_instances": running_pods,  # Running pod count
+                "total_pods": total_pods,
                 "pods": filtered_pods,  # Now includes both name and status
                 "services": filtered_services
             }
