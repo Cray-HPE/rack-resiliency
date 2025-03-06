@@ -1,0 +1,20 @@
+apiVersion: v2
+name: cray-rrs
+description: Helm chart for cray-rrs deployment
+version: 0.0.0-rrsserv-chart
+appVersion: 0.0.0-rrsderv-docker
+keywords:
+- Rack Resiliency Service
+- RRS
+home: https://github.com/Cray-HPE/rack-resiliency
+sources:
+- https://github.com/Cray-HPE/rack-resiliency
+dependencies:
+- name: cray-service
+  version: ^11.0.0
+  repository: https://artifactory.algol60.net/artifactory/csm-helm-charts/
+maintainers:
+- name: keshav-06-hpe
+  email: keshav.varshney@hpe.com
+- name: arka-pramanik-hpe
+  email: arka.pramianik@hpe.com

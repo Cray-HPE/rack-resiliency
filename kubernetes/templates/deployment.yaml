@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: k8s-zone-api
+  namespace: {{ .Values.department }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: k8s-zone-api
+  template:
+    metadata:
+      labels:
+        app: k8s-zone-api
+    spec:
+      serviceAccountName: {{ .Values.auth.serviceAccount }}
+      containers:
+      - name: k8s-zone-api
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.service.port }}
+          name: http
+          protocol: TCP
+        volumeMounts:
+        - name: ceph-config
+          mountPath: /etc/ceph
+          readOnly: true
+        - name: critical-svc
+          mountPath: /etc/config
+          subPath: critical-service-config.json
+          readOnly: false
+        - name: ssh-config
+          mountPath: /etc/ssh
+          readOnly: true
+        - name: ssh-hp
+          mountPath: /root/.ssh
+          readOnly: true
+      volumes:
+      - name: ssh-config
+        hostPath:
+          path: {{ .Values.volumes.sshConfigPath }}
+          type: Directory
+      - name: ssh-hp
+        hostPath:
+          path: {{ .Values.volumes.sshHpPath }}
+          type: Directory
+      - name: ceph-config
+        configMap:
+          name: {{ .Values.volumes.cephConfigName }}
+      - name: critical-svc
+        configMap:
+          name: {{ .Values.volumes.criticalSvcConfigName }}
