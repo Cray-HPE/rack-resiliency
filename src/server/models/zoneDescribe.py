@@ -49,7 +49,7 @@ def describe_zone(zone_name):
         return jsonify({"error": "Zone not found"})
 
     zone_data = {
-        "zone_name": zone_name,
+        "Zone Name": zone_name,
         "Management Masters": len(masters),
         "Management Workers": len(workers),
         "Management Storage": len(storage)
