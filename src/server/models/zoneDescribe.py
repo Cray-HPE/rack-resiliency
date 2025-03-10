@@ -49,29 +49,35 @@ def describe_zone(zone_name):
         return jsonify({"error": "Zone not found"})
 
     zone_data = {
-        "Zone Name": zone_name,
+        "zone_name": zone_name,
         "Management Masters": len(masters),
         "Management Workers": len(workers),
-        "Management Storage": len(storage),
-        "nodes": {}
+        "Management Storage": len(storage)
     }
 
     if masters:
-        zone_data["nodes"]["masters"] = {
-            "type": "Kubernetes Topology Zone",
-            "nodes": masters
+        zone_data["Management Master"] = {
+            "Type": "Kubernetes Topology Zone",
+            "Nodes": [{"Name": node["name"], "Status": node["status"]} for node in masters]
         }
     
     if workers:
-        zone_data["nodes"]["workers"] = {
-            "type": "Kubernetes Topology Zone",
-            "nodes": workers
+        zone_data["Management Worker"] = {
+            "Type": "Kubernetes Topology Zone",
+            "Nodes": [{"Name": node["name"], "Status": node["status"]} for node in workers]
         }
     
     if storage:
-        zone_data["nodes"]["storage"] = {
-            "type": "Ceph Zone",
-            "nodes": storage
+        zone_data["Management Storage"] = {
+            "Type": "CEPH Zone",
+            "Nodes": []
         }
-
+        for node in storage:
+            storage_node = {
+                "Name": node["name"],
+                "Status": node["status"],
+                "OSDs": [{"name": osd["name"], "status": osd["status"]} for osd in node.get("osds", [])]
+            }
+            zone_data["Management Storage"]["Nodes"].append(storage_node)
+    
     return jsonify(zone_data)

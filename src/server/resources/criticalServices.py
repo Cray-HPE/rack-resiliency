@@ -24,6 +24,7 @@
 
 from kubernetes import client, config
 from flask import json
+from resources.k8sZones import get_k8s_nodes_data
 
 CONFIGMAP_NAME = "rrs-map"
 CONFIGMAP_NAMESPACE = "rack-resiliency"
@@ -36,26 +37,47 @@ def get_namespaced_pods(service_info, service_name):
     namespace = service_info["namespace"]
     resource_type = service_info["type"]
     v1 = client.CoreV1Api()
+    apps_v1 = client.AppsV1Api()
+
+    nodes_data = get_k8s_nodes_data()
+    if isinstance(nodes_data, dict) and "error" in nodes_data:
+        return {"error": nodes_data["error"]}
+
+    node_zone_map = {
+        node["name"]: zone
+        for zone, node_types in nodes_data.items()
+        for node_type in ["masters", "workers"]
+        for node in node_types[node_type]
+    }
 
     # Get all pods in the namespace and filter by owner reference
     pod_list = v1.list_namespaced_pod(namespace)
     running_pods = 0
-    total_pods = 0
-
     result = []
+    zone_pod_count = {}
+
     for pod in pod_list.items:
         if pod.metadata.owner_references and any(
             owner.kind == isDeploy(resource_type) and owner.name.startswith(service_name)
             for owner in pod.metadata.owner_references
         ):
-            total_pods += 1
-            if pod.status.phase == "Running":
+            pod_status = pod.status.phase
+            if pod_status == "Running":
                 running_pods += 1
+            
+            node_name = pod.spec.node_name
+            zone = node_zone_map.get(node_name, "unknown")
+
+            # Count pods in each zone
+            zone_pod_count[zone] = zone_pod_count.get(zone, 0) + 1
+
             result.append({
-                "name": pod.metadata.name,
-                "status": pod.status.phase
+                "Name": pod.metadata.name,
+                "Status": pod_status,
+                "Node": node_name,
+                "Zone": zone
             })
-    return result, running_pods, total_pods
+    return result, running_pods
 
 def get_namespaced_services(service_info, service_name):
     """Fuction to fetch the services in a namespace and number of instances using Kube-config"""

@@ -22,7 +22,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-from flask import Flask, jsonify, request
+from flask import Flask, request
 from models.zoneList import get_zones
 from models.zoneDescribe import describe_zone
 from models.criticalServiceList import get_critical_service_list

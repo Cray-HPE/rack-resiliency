@@ -39,7 +39,7 @@ def get_service_details(service_name):
         resource_type = service_info["type"]
 
         # Get all pods in the namespace and filter by owner reference
-        filtered_pods, total_pods, running_pods = get_namespaced_pods(service_info, service_name)
+        filtered_pods, running_pods = get_namespaced_pods(service_info, service_name)
 
         # Get configured instances
         apps_v1 = client.AppsV1Api()
