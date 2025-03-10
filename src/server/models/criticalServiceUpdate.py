@@ -102,12 +102,12 @@ def update_configmap(new_data):
 def update_critical_services(new_data):
     """Function to update critical services in the ConfigMap."""
     try:
-        if not new_data or "new_services" not in new_data:
+        if not new_data or "file" not in new_data:
             return jsonify({"error": "Invalid request format"}), 400
 
         # Parse the nested JSON string inside "services"
         try:
-            new_data = new_data.get("new_services")
+            new_data = new_data.get("file")
             new_services = json.loads(new_data)
         except json.JSONDecodeError:
             return jsonify({"error": "Invalid JSON format in services"}), 400
