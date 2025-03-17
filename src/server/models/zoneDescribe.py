@@ -52,7 +52,7 @@ def describe_zone(zone_name):
         "Zone Name": zone_name,
         "Management Masters": len(masters),
         "Management Workers": len(workers),
-        "Management Storage": len(storage)
+        "Management Storages": len(storage)
     }
 
     if masters:
@@ -73,10 +73,14 @@ def describe_zone(zone_name):
             "Nodes": []
         }
         for node in storage:
+            osd_status_map = {}
+            for osd in node.get("osds", []):
+                osd_status_map.setdefault(osd["status"], []).append(osd["name"])
+            
             storage_node = {
                 "Name": node["name"],
                 "Status": node["status"],
-                "OSDs": [{"name": osd["name"], "status": osd["status"]} for osd in node.get("osds", [])]
+                "OSDs": osd_status_map
             }
             zone_data["Management Storage"]["Nodes"].append(storage_node)
     
