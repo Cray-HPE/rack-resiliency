@@ -2,11 +2,6 @@ import unittest
 from src.server.models.zoneList import map_zones
 from mock_data import MOCK_K8S_RESPONSE, MOCK_ERROR_RESPONSE, MOCK_CEPH_RESPONSE
 
-# Mock error response
-MOCK_ERROR_RESPONSE = {"error": "Failed to fetch data"}
-MOCK_ERROR_CRT_SVC = {"error": "string indices must be integers"} # since func only read json
-MOCK_CRITICAL_SERVICES_RESPONSE = {"coredns": {"namespace": "kube-system","type": "Deployment"},"kube-proxy": {"namespace": "kube-system","type": "DaemonSet"}}
-
 class TestZoneMapping(unittest.TestCase):
     def test_zone_mapping_success(self):
         result = map_zones(MOCK_K8S_RESPONSE, MOCK_CEPH_RESPONSE)
