@@ -25,11 +25,11 @@
 from flask import jsonify
 from resources.criticalServices import *
 from kubernetes import client
+from resources.errorPrint import pretty_print_error
 
-def get_service_details(service_name):
+def get_service_details(services, service_name):
     """Retrieve details of a specific critical service."""
     try:
-        services = get_configmap().get("critical-services", {})
         if service_name not in services:
             return {"error": "Service not found"}
         
@@ -65,8 +65,9 @@ def get_service_details(service_name):
             }
         }
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": str(pretty_print_error(e))}
 
 def describe_service(service_name):
     """Returning the response in JSON Format"""
-    return jsonify(get_service_details(service_name))
+    services = get_configmap().get("critical-services", {})
+    return jsonify(get_service_details(services, service_name))

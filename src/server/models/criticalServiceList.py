@@ -24,11 +24,11 @@
 
 from flask import jsonify
 from resources.criticalServices import get_configmap
+from resources.errorPrint import pretty_print_error
 
-def get_critical_services():
+def get_critical_services(services):
     """Fetch and format critical services grouped by namespace in the required structure."""
     try:
-        services = get_configmap().get("critical-services", {})
         result = {"namespace": {}}
         for name, details in services.items():
             namespace = details["namespace"]
@@ -41,9 +41,13 @@ def get_critical_services():
 
         return result
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": str(pretty_print_error(e))}
 
 def get_critical_service_list():
     """Returning the response in JSON Format"""
-    return jsonify({"critical-services": get_critical_services()})
+    try:
+        services = get_configmap().get("critical-services", {})
+        return jsonify({"critical-services": get_critical_services(services)})
+    except Exception as e:
+        return {"error": str(pretty_print_error(e))}
 
