@@ -51,8 +51,13 @@ def get_k8s_nodes_data():
 
     for node in nodes:
         node_name = node.metadata.name
-        node_status = node.status.conditions[-1].type if node.status.conditions else 'Unknown'
+        node_status = node.status.conditions[-1].status if node.status.conditions else 'Unknown'
         node_zone = node.metadata.labels.get('topology.kubernetes.io/zone', None)
+        
+        if node_status == "True":
+            node_status = "Ready"
+        else:
+            node_status = "NotReady"
 
         if node_zone:
             if node_zone not in zone_mapping:

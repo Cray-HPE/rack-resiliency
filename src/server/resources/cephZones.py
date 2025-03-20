@@ -25,6 +25,7 @@
 import json
 # import rados
 import subprocess
+import concurrent.futures
 # def get_ceph_details():
 #     """Fetch Ceph OSD tree details using rados."""
 #     try:
@@ -66,32 +67,53 @@ import subprocess
 #         return {"error": str(e)}
 
 host = 'ncn-m001'
-def get_ceph_details():
-    """Function to fetch the CEPH OSD details using ssh"""
-    cmd = f"ssh {host} 'ceph osd tree -f json-pretty'"
-    try:
-        result = subprocess.run(cmd,shell=True,check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True,)
-        if result.returncode != 0:
-            raise ValueError(f"Error fetching Ceph details: {result.stderr}")
-        return json.loads(result.stdout)
-    except Exception as e:
-        return {"error": str(e)}
+# def get_ceph_details():
+#     """Function to fetch the CEPH OSD details using ssh"""
+#     cmd = f"ssh {host} 'ceph osd tree -f json-pretty'"
+#     try:
+#         result = subprocess.run(cmd,shell=True,check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True,)
+#         if result.returncode != 0:
+#             raise ValueError(f"Error fetching Ceph details: {result.stderr}")
+#         return json.loads(result.stdout)
+#     except Exception as e:
+#         return {"error": str(e)}
 
-def get_ceph_hosts():
-    """Function to fetch the hosts details using ssh"""
-    cmd = f"ssh {host} 'ceph orch host ls -f json-pretty'"
-    try:
-        result = subprocess.run(cmd,shell=True,check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True,)
-        if result.returncode != 0:
-            raise ValueError(f"Error fetching Ceph details: {result.stderr}")
-        return json.loads(result.stdout)
-    except Exception as e:
-        return {"error": str(e)}
+# def get_ceph_hosts():
+#     """Function to fetch the hosts details using ssh"""
+#     cmd = f"ssh {host} 'ceph orch host ls -f json-pretty'"
+#     try:
+#         result = subprocess.run(cmd,shell=True,check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True,)
+#         if result.returncode != 0:
+#             raise ValueError(f"Error fetching Ceph details: {result.stderr}")
+#         return json.loads(result.stdout)
+#     except Exception as e:
+#         return {"error": str(e)}
+
+def fetch_ceph_data():
+    """Fetch Ceph OSD and host details in parallel."""
+    ceph_details_cmd = "ssh ncn-m001 'ceph osd tree -f json-pretty'"
+    ceph_hosts_cmd = "ssh ncn-m001 'ceph orch host ls -f json-pretty'"
+    
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        future_ceph_tree = executor.submit(subprocess.run, ceph_details_cmd, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        future_ceph_hosts = executor.submit(subprocess.run, ceph_hosts_cmd, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+
+        ceph_tree_result = future_ceph_tree.result()
+        ceph_hosts_result = future_ceph_hosts.result()
+
+        if ceph_tree_result.returncode != 0 or ceph_hosts_result.returncode != 0:
+            raise ValueError(f"Error fetching Ceph details: {ceph_tree_result.stderr} / {ceph_hosts_result.stderr}")
+        
+        ceph_tree = json.loads(ceph_tree_result.stdout)
+        ceph_hosts = json.loads(ceph_hosts_result.stdout)
+        
+        return ceph_tree, ceph_hosts
 
 def get_ceph_storage_nodes():
     """Fetch Ceph storage nodes and their OSD statuses."""
-    ceph_tree = get_ceph_details()
-    ceph_hosts = get_ceph_hosts()
+    # ceph_tree = get_ceph_details()
+    # ceph_hosts = get_ceph_hosts()
+    ceph_tree, ceph_hosts = fetch_ceph_data()
 
     if isinstance(ceph_tree, dict) and "error" in ceph_tree:
         return {"error": ceph_tree["error"]}

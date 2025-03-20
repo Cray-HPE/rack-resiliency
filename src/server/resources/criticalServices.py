@@ -24,20 +24,20 @@
 
 from kubernetes import client, config
 from flask import json
-from resources.k8sZones import get_k8s_nodes_data
+from resources.k8sZones import get_k8s_nodes_data, load_k8s_config
+# import os
 
 CONFIGMAP_NAME = "rrs-map"
 CONFIGMAP_NAMESPACE = "rack-resiliency"
 CONFIGMAP_KEY = "critical-service-config.json"
 
-config.load_incluster_config()
+load_k8s_config()
 
 def get_namespaced_pods(service_info, service_name):
     """Fuction to fetch the pods in a namespace and number of instances using Kube-config"""
     namespace = service_info["namespace"]
     resource_type = service_info["type"]
     v1 = client.CoreV1Api()
-    apps_v1 = client.AppsV1Api()
 
     nodes_data = get_k8s_nodes_data()
     if isinstance(nodes_data, dict) and "error" in nodes_data:
@@ -79,21 +79,21 @@ def get_namespaced_pods(service_info, service_name):
             })
     return result, running_pods
 
-def get_namespaced_services(service_info, service_name):
-    """Fuction to fetch the services in a namespace and number of instances using Kube-config"""
-    namespace = service_info["namespace"]
-    v1 = client.CoreV1Api()
+# def get_namespaced_services(service_info, service_name):
+#     """Fuction to fetch the services in a namespace and number of instances using Kube-config"""
+#     namespace = service_info["namespace"]
+#     v1 = client.CoreV1Api()
 
-    # Get all services in the namespace and filter by owner reference
-    svc_list = v1.list_namespaced_service(namespace)
-    result = [
-        svc.metadata.name for svc in svc_list.items
-        if svc.spec.selector and any(
-            key in svc.spec.selector and svc.spec.selector[key] == service_name
-            for key in svc.spec.selector
-        )
-    ]
-    return result
+#     # Get all services in the namespace and filter by owner reference
+#     svc_list = v1.list_namespaced_service(namespace)
+#     result = [
+#         svc.metadata.name for svc in svc_list.items
+#         if svc.spec.selector and any(
+#             key in svc.spec.selector and svc.spec.selector[key] == service_name
+#             for key in svc.spec.selector
+#         )
+#     ]
+#     return result
 
 def isDeploy(resource_type):
     """To check if resource is Deployment"""
@@ -110,3 +110,20 @@ def get_configmap():
         return {"critical-services": {}}
     except client.exceptions.ApiException as e:
         return {"error": f"Failed to fetch ConfigMap: {e}"}
+
+
+# VOLUME_MOUNT_PATH = "/etc/config"
+# def get_configmap():
+#     """Fetch the current ConfigMap data from the mounted volume."""
+#     try:
+#         config_file_path = os.path.join(VOLUME_MOUNT_PATH, CONFIGMAP_KEY)
+        
+#         # Check if the file exists
+#         if os.path.exists(config_file_path):
+#             with open(config_file_path, "r") as file:
+#                 config_data = json.load(file)  # Parse JSON data from the file
+#                 return config_data
+#         else:
+#             return {"error": f"ConfigMap file not found at {config_file_path}"}
+#     except Exception as e:
+#         return {"error": f"Failed to read ConfigMap file: {e}"}
