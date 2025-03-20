@@ -26,6 +26,7 @@ import json
 from flask import jsonify
 from kubernetes import client
 from resources.criticalServices import *
+from resources.errorPrint import pretty_print_error
 
 # def serviceExist(service_name,new_services):
 #     """Function to check if the service to be updated has any instances running on cluster"""
@@ -45,12 +46,12 @@ from resources.criticalServices import *
 #     except Exception as e:
 #         return {"error": str(e)} 
 
-def update_configmap(new_data):
+def update_configmap(new_data, existing_data, test=False):
     """Update the ConfigMap in the Kubernetes cluster with the merged data."""
     try:
         v1 = client.CoreV1Api()
         # Fetch the existing ConfigMap data
-        existing_data = get_configmap()
+        # existing_data = get_configmap()
         if "error" in existing_data:
             return existing_data
         
@@ -77,7 +78,10 @@ def update_configmap(new_data):
 
         # Patch the ConfigMap with the updated data
         body = {"data": {CONFIGMAP_KEY: updated_json_str}}
-        v1.patch_namespaced_config_map(CONFIGMAP_NAME, CONFIGMAP_NAMESPACE, body)
+        
+        # Added the condition for CI testcase
+        if not(test):
+            v1.patch_namespaced_config_map(CONFIGMAP_NAME, CONFIGMAP_NAMESPACE, body)
 
         response = {"Update": "Successful"}
 
@@ -97,10 +101,10 @@ def update_configmap(new_data):
         return response
 
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": str(pretty_print_error(e))}
 
     except client.exceptions.ApiException as e:
-        return {"error": f"Failed to update ConfigMap: {e}"}
+        return {"error": f"Failed to update ConfigMap: {pretty_print_error(e)}"}
 
 def update_critical_services(new_data):
     """Function to update critical services in the ConfigMap."""
@@ -118,8 +122,9 @@ def update_critical_services(new_data):
         if "critical-services" not in new_services:
             return jsonify({"error": "Missing 'critical-services' in payload"}), 400
         
-        result = update_configmap(new_data)
+        existing_data = get_configmap()
+        result = update_configmap(new_data, existing_data)
         return jsonify(result)
     
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": str(pretty_print_error(e))}), 500
