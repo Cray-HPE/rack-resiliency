@@ -27,26 +27,23 @@ from resources.k8sZones import get_k8s_nodes_data
 from resources.cephZones import get_ceph_storage_nodes
 from models.zoneList import zoneExist
 
-def describe_zone(zone_name):
+def get_zone_info(zone_name,k8s_zones,ceph_zones):
     """Function to get detailed information of a specific zone."""
-    k8s_zone_mapping = get_k8s_nodes_data()
-    ceph_zones = get_ceph_storage_nodes()
-
-    if isinstance(k8s_zone_mapping, dict) and "error" in k8s_zone_mapping:
-        return jsonify({"error": k8s_zone_mapping["error"]})
+    if isinstance(k8s_zones, dict) and "error" in k8s_zones:
+        return {"error": k8s_zones["error"]}
     
     if isinstance(ceph_zones, dict) and "error" in ceph_zones:
-        return jsonify({"error": ceph_zones["error"]})
+        return {"error": ceph_zones["error"]}
     
-    if isinstance(k8s_zone_mapping, str) or isinstance(ceph_zones, str):
-        return zoneExist(k8s_zone_mapping, ceph_zones)
+    if isinstance(k8s_zones, str) or isinstance(ceph_zones, str):
+        return zoneExist(k8s_zones, ceph_zones)
 
-    masters = k8s_zone_mapping.get(zone_name, {}).get("masters", [])
-    workers = k8s_zone_mapping.get(zone_name, {}).get("workers", [])
+    masters = k8s_zones.get(zone_name, {}).get("masters", [])
+    workers = k8s_zones.get(zone_name, {}).get("workers", [])
     storage = ceph_zones.get(zone_name, [])
 
     if not (masters or workers or storage):
-        return jsonify({"error": "Zone not found"})
+        return {"error": "Zone not found"}
 
     zone_data = {
         "Zone Name": zone_name,
@@ -84,4 +81,9 @@ def describe_zone(zone_name):
             }
             zone_data["Management Storage"]["Nodes"].append(storage_node)
     
-    return jsonify(zone_data)
+    return zone_data
+
+def describe_zone(zone_name):
+    k8s_zones = get_k8s_nodes_data()
+    ceph_zones = get_ceph_storage_nodes()
+    return jsonify(get_zone_info(zone_name, k8s_zones, ceph_zones))
