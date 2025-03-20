@@ -28,7 +28,7 @@ from models.zoneDescribe import describe_zone
 from models.criticalServiceList import get_critical_service_list
 from models.criticalServiceDescribe import describe_service
 from models.criticalServiceUpdate import update_critical_services
-
+from models.criticalServiceStatusList import get_critical_services_status
 app = Flask(__name__)
 
 # Endpoint to get the list of zones
@@ -56,6 +56,11 @@ def describeCriticalService(service_name):
 def updateCriticalService():
     new_data = request.get_json()
     return update_critical_services(new_data)
+
+# Endpoint to get the list of critical services status
+@app.route("/criticalservices/status", methods=["GET"])
+def listStatusCrtiticalServices():
+    return get_critical_services_status()
 
 # Running the Flask app
 if __name__ == "__main__":
