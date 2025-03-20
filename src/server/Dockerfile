@@ -1,27 +1,3 @@
-#
-# MIT License
-#
-# (C) Copyright [2024-2025] Hewlett Packard Enterprise Development LP
-#
-# Permission is hereby granted, free of charge, to any person obtaining a
-# copy of this software and associated documentation files (the "Software"),
-# to deal in the Software without restriction, including without limitation
-# the rights to use, copy, modify, merge, publish, distribute, sublicense,
-# and/or sell copies of the Software, and to permit persons to whom the
-# Software is furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included
-# in all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-# OTHER DEALINGS IN THE SOFTWARE.
-#
-
 FROM alpine:latest
 
 # Update package manager and install necessary dependencies
@@ -33,17 +9,22 @@ RUN apk update && \
 RUN python3 -m venv /venv
 ENV PATH="/venv/bin:$PATH"
 
-# Install Python packages within the virtual environment
-RUN pip3 install kubernetes flask
-
-# Enable and start SSH service
-RUN mkdir -p /var/run/sshd && echo "PermitRootLogin yes" >> /etc/ssh/sshd_config
+# Enable and start SSH service (consider security implications)
+RUN mkdir -p /var/run/sshd && \
+    echo "PermitRootLogin yes" >> /etc/ssh/sshd_config && \
+    sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/g' /etc/ssh/sshd_config && \
+    ssh-keygen -A
 
 # Set the working directory in the container
 WORKDIR /src/server
 
 # Copy the current directory contents into the container
 COPY . .
+
+# Install Python packages within the virtual environment
+RUN pip3 install --no-cache-dir -U pip -c constraints.txt && \
+    pip3 install --no-cache-dir -U wheel -c constraints.txt && \
+    pip3 install --no-cache-dir -r requirements.txt
 
 EXPOSE 80 22
 
