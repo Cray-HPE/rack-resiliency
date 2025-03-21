@@ -27,10 +27,6 @@ from flask import json
 from resources.k8s_zones import get_k8s_nodes_data, load_k8s_config
 # import os
 
-CONFIGMAP_NAME = "rrs-map"
-CONFIGMAP_NAMESPACE = "rack-resiliency"
-CONFIGMAP_KEY = "critical-service-config.json"
-
 load_k8s_config()
 
 def get_namespaced_pods(service_info, service_name):
@@ -100,13 +96,13 @@ def isDeploy(resource_type):
     return "ReplicaSet" if resource_type == "Deployment" else resource_type
 
 
-def get_configmap():
+def get_configmap(cm_name, cm_namespace, cm_key):
     """Fetch the current ConfigMap data from the Kubernetes cluster."""
     try:
         v1 = client.CoreV1Api()
-        cm = v1.read_namespaced_config_map(CONFIGMAP_NAME, CONFIGMAP_NAMESPACE)
-        if CONFIGMAP_KEY in cm.data:
-            return json.loads(cm.data[CONFIGMAP_KEY])  # Convert JSON string to Python dictionary
+        cm = v1.read_namespaced_config_map(cm_name, cm_namespace)
+        if cm_key in cm.data:
+            return json.loads(cm.data[cm_key])  # Convert JSON string to Python dictionary
         return {"critical-services": {}}
     except client.exceptions.ApiException as e:
         return {"error": f"Failed to fetch ConfigMap: {e}"}

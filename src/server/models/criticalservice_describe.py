@@ -23,9 +23,13 @@
 #
 
 from flask import jsonify
-from resources.criticalServices import *
+from resources.critical_services import *
 from kubernetes import client
-from resources.errorPrint import pretty_print_error
+from resources.error_print import pretty_print_error
+
+cm_name = "rrs-mon-static"
+cm_namespace = "rack-resiliency"
+cm_key = "critical-service-config.json"
 
 def get_service_details(services, service_name):
     """Retrieve details of a specific critical service."""
@@ -69,5 +73,8 @@ def get_service_details(services, service_name):
 
 def describe_service(service_name):
     """Returning the response in JSON Format"""
-    services = get_configmap().get("critical-services", {})
-    return jsonify(get_service_details(services, service_name))
+    try:
+        services = get_configmap(cm_name, cm_namespace, cm_key).get("critical-services", {})
+        return jsonify(get_service_details(services, service_name))
+    except Exception as e:
+        return {"error": str(pretty_print_error(e))}

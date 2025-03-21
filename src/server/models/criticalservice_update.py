@@ -25,8 +25,12 @@
 import json
 from flask import jsonify
 from kubernetes import client
-from resources.criticalServices import *
-from resources.errorPrint import pretty_print_error
+from resources.critical_services import *
+from resources.error_print import pretty_print_error
+
+cm_name = "rrs-mon-static"
+cm_namespace = "rack-resiliency"
+cm_key = "critical-service-config.json"
 
 # def serviceExist(service_name,new_services):
 #     """Function to check if the service to be updated has any instances running on cluster"""
@@ -77,11 +81,11 @@ def update_configmap(new_data, existing_data, test=False):
         updated_json_str = json.dumps({"critical-services": existing_services}, indent=2)
 
         # Patch the ConfigMap with the updated data
-        body = {"data": {CONFIGMAP_KEY: updated_json_str}}
+        body = {"data": {cm_key: updated_json_str}}
         
         # Added the condition for CI testcase
         if not(test):
-            v1.patch_namespaced_config_map(CONFIGMAP_NAME, CONFIGMAP_NAMESPACE, body)
+            v1.patch_namespaced_config_map(cm_name, cm_namespace, body)
 
         response = {"Update": "Successful"}
 
@@ -122,7 +126,7 @@ def update_critical_services(new_data):
         if "critical-services" not in new_services:
             return jsonify({"error": "Missing 'critical-services' in payload"}), 400
         
-        existing_data = get_configmap()
+        existing_data = get_configmap(cm_name, cm_namespace, cm_key)
         result = update_configmap(new_data, existing_data)
         return jsonify(result)
     

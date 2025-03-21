@@ -23,8 +23,12 @@
 #
 
 from flask import jsonify
-from resources.criticalServices import get_configmap
-from resources.errorPrint import pretty_print_error
+from resources.critical_services import get_configmap
+from resources.error_print import pretty_print_error
+
+cm_name = "rrs-mon-static"
+cm_namespace = "rack-resiliency"
+cm_key = "critical-service-config.json"
 
 def get_critical_services(services):
     """Fetch and format critical services grouped by namespace in the required structure."""
@@ -46,7 +50,7 @@ def get_critical_services(services):
 def get_critical_service_list():
     """Returning the response in JSON Format"""
     try:
-        services = get_configmap().get("critical-services", {})
+        services = get_configmap(cm_name, cm_namespace, cm_key).get("critical-services", {})
         return jsonify({"critical-services": get_critical_services(services)})
     except Exception as e:
         return {"error": str(pretty_print_error(e))}
