@@ -7,7 +7,7 @@ class TestZoneMapping(unittest.TestCase):
         result = map_zones(MOCK_K8S_RESPONSE, MOCK_CEPH_RESPONSE)
         self.assertIn("Zones", result)
         self.assertGreater(len(result["Zones"]), 0)
-        self.assertTrue(any(zone["Zone Name"] == "zone1" for zone in result["Zones"]))
+        self.assertTrue(any(zone["Zone Name"] == "x3002" for zone in result["Zones"]))
     
     def test_k8s_api_failure(self):
         result = map_zones(MOCK_ERROR_RESPONSE, MOCK_CEPH_RESPONSE)
@@ -27,7 +27,7 @@ class TestZoneMapping(unittest.TestCase):
     
     def test_node_status(self):
         result = map_zones(MOCK_K8S_RESPONSE, MOCK_CEPH_RESPONSE)
-        zone = next(zone for zone in result["Zones"] if zone["Zone Name"] == "zone1")
+        zone = next(zone for zone in result["Zones"] if zone["Zone Name"] == "x3002")
         self.assertIn("Kubernetes Topology Zone", zone)
         self.assertIn("Management Master Nodes", zone["Kubernetes Topology Zone"])
         self.assertIn("ncn-m001", zone["Kubernetes Topology Zone"]["Management Master Nodes"])
