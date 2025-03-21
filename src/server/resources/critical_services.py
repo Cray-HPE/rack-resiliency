@@ -22,9 +22,9 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-from kubernetes import client, config
+from kubernetes import client
 from flask import json
-from resources.k8sZones import get_k8s_nodes_data, load_k8s_config
+from resources.k8s_zones import get_k8s_nodes_data, load_k8s_config
 # import os
 
 CONFIGMAP_NAME = "rrs-map"
