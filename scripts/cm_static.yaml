@@ -426,15 +426,15 @@ data:
         },
         "kube-apiserver": {
           "namespace": "kube-system",
-          "type": "static pod"
+          "type": "Pod"
         },
         "kube-controller-manager": {
           "namespace": "kube-system",
-          "type": "static pod"
+          "type": "Pod"
         },
         "kube-scheduler": {
           "namespace": "kube-system",
-          "type": "static pod"
+          "type": "Pod"
         }
       }
     }
