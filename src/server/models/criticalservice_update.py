@@ -21,94 +21,61 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
+"""
+Model handles updates to critical services in the ConfigMap.
+"""
 
 import json
+import logging
 from flask import jsonify
 from kubernetes import client
-from resources.critical_services import *
+from resources.critical_services import get_configmap
 from resources.error_print import pretty_print_error
+from models.criticalservice_list import CM_KEY, CM_NAME, CM_NAMESPACE
 
-cm_name = "rrs-mon-static"
-cm_namespace = "rack-resiliency"
-cm_key = "critical-service-config.json"
-
-# def serviceExist(service_name,new_services):
-#     """Function to check if the service to be updated has any instances running on cluster"""
-#     try:
-#         service_info = new_services[service_name]
-
-#         # Get all pods in the namespace and filter by owner reference
-#         filtered_pods = get_namespaced_pods(service_info, service_name)
-
-#         # Get all services in the namespace and filter by label selector
-#         filtered_services = get_namespaced_services(service_info, service_name)
-
-#         if len(filtered_pods[0]) == 0 and len(filtered_services) == 0:
-#             return False
-#         return True
-    
-#     except Exception as e:
-#         return {"error": str(e)} 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+LOGGER = logging.getLogger(__name__)
 
 def update_configmap(new_data, existing_data, test=False):
-    """Update the ConfigMap in the Kubernetes cluster with the merged data."""
+    """Update the ConfigMap with new critical services."""
     try:
         v1 = client.CoreV1Api()
-        # Fetch the existing ConfigMap data
-        # existing_data = get_configmap()
+
         if "error" in existing_data:
             return existing_data
-        
-        # Merge the existing and new data
+
         existing_services = existing_data.get("critical-services", {})
-        new_services = json.loads(new_data)
+        new_services = json.loads(new_data)["critical-services"]
 
-        # Merge new services, checking for duplicates
-        added_services = []
-        skipped_services = []
-        # non_existing_services = []
-        for service_name, details in new_services["critical-services"].items():
-            if service_name in existing_services:
-                skipped_services.append(service_name)
-            else:
-                # if serviceExist(service_name, new_services["critical-services"]):
-                    existing_services[service_name] = details
-                    added_services.append(service_name)
-                # else:
-                    # non_existing_services.append(service_name)
+        # Separate added and skipped services
+        added_services = [s for s in new_services if s not in existing_services]
+        skipped_services = [s for s in new_services if s in existing_services]
 
-        # Convert back to JSON string for ConfigMap storage
-        updated_json_str = json.dumps({"critical-services": existing_services}, indent=2)
+        for service_name in added_services:
+            existing_services[service_name] = new_services[service_name]
 
-        # Patch the ConfigMap with the updated data
-        body = {"data": {cm_key: updated_json_str}}
-        
-        # Added the condition for CI testcase
-        if not(test):
-            v1.patch_namespaced_config_map(cm_name, cm_namespace, body)
+        # Patch ConfigMap
+        if not test:
+            body = {"data": {CM_KEY: json.dumps({"critical-services": existing_services}, indent=2)}}
+            v1.patch_namespaced_config_map(CM_NAME, CM_NAMESPACE, body)
 
-        response = {"Update": "Successful"}
+        return {
+            "Update": "Successful" if added_services else "Services Already Exist",
+            "Successfully Added Services": added_services or [],
+            "Already Existing Services": skipped_services or [],
+        }
 
-        if added_services:
-            response["Successfully Added Services"] = added_services
-        if skipped_services:
-            response["Already Existing Services"] = skipped_services
-            if len(added_services) == 0:
-                response["Update"] = "Services Already Exist"
-        # if non_existing_services:
-        #     response["Unknown Services"] = non_existing_services
-        #     response["Message for unknown services"] = (
-        #         "Service(s) has no associated pods in the namespace, Please verify the Information"
-        #     )
-        # else:
-        #     response["Update"] = "Unsuccessful"
-        return response
-
+    except json.JSONDecodeError as json_err:
+        return {"error": f"Invalid JSON format: {pretty_print_error(json_err)}"}
+    except client.exceptions.ApiException as api_exc:
+        return {"error": f"Failed to update ConfigMap: {pretty_print_error(api_exc)}"}
+    except KeyError as key_exc:
+        return {"error": f"Missing key: {pretty_print_error(key_exc)}"}
+    except (TypeError, ValueError, AttributeError) as parse_exc:
+        return {"error": f"Parsing error: {pretty_print_error(parse_exc)}"}
     except Exception as e:
-        return {"error": str(pretty_print_error(e))}
-
-    except client.exceptions.ApiException as e:
-        return {"error": f"Failed to update ConfigMap: {pretty_print_error(e)}"}
+        return {"error": f"Unexpected error: {pretty_print_error(e)}"}
 
 def update_critical_services(new_data):
     """Function to update critical services in the ConfigMap."""
@@ -116,19 +83,19 @@ def update_critical_services(new_data):
         if not new_data or "from_file" not in new_data:
             return jsonify({"error": "Invalid request format"}), 400
 
-        # Parse the nested JSON string inside "services"
         try:
-            new_data = new_data.get("from_file")
-            new_services = json.loads(new_data)
-        except json.JSONDecodeError:
+            new_services = json.loads(new_data["from_file"])
+        except json.JSONDecodeError as json_err:
+            LOGGER.error("Invalid JSON format in request: %s", json_err)
             return jsonify({"error": "Invalid JSON format in services"}), 400
 
         if "critical-services" not in new_services:
             return jsonify({"error": "Missing 'critical-services' in payload"}), 400
-        
-        existing_data = get_configmap(cm_name, cm_namespace, cm_key)
-        result = update_configmap(new_data, existing_data)
+
+        existing_data = get_configmap(CM_NAME, CM_NAMESPACE, CM_KEY)
+        result = update_configmap(json.dumps(new_services), existing_data)
         return jsonify(result)
-    
+
     except Exception as e:
-        return jsonify({"error": str(pretty_print_error(e))}), 500
+        LOGGER.error("Unhandled error in update_critical_services: %s", e)
+        return jsonify({"error": f"Unexpected error: {pretty_print_error(e)}"}), 500

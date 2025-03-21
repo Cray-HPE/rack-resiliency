@@ -22,36 +22,55 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
+"""
+Model to fetch and format critical services from a Kubernetes ConfigMap.
+"""
+
 from flask import jsonify
 from resources.critical_services import get_configmap
 from resources.error_print import pretty_print_error
 
-cm_name = "rrs-mon-static"
-cm_namespace = "rack-resiliency"
-cm_key = "critical-service-config.json"
+CM_NAME = "rrs-mon-static"
+CM_NAMESPACE = "rack-resiliency"
+CM_KEY = "critical-service-config.json"
 
-def get_critical_services(services):
-    """Fetch and format critical services grouped by namespace in the required structure."""
+def get_critical_services(services: dict) -> dict:
+    """
+    Fetch and format critical services grouped by namespace.
+
+    Args:
+        services (dict): A dictionary of services with their metadata.
+
+    Returns:
+        dict: A structured dictionary grouped by namespaces.
+    """
+    result = {"namespace": {}}
     try:
-        result = {"namespace": {}}
         for name, details in services.items():
-            namespace = details["namespace"]
+            namespace = details.get("namespace", "unknown")
+            service_type = details.get("type", "unknown")
+
             if namespace not in result["namespace"]:
                 result["namespace"][namespace] = []
-            result["namespace"][namespace].append({
-                "name": name,
-                "type": details["type"]
-            })
 
-        return result
-    except Exception as e:
-        return {"error": str(pretty_print_error(e))}
+            result["namespace"][namespace].append({"name": name, "type": service_type})
+
+    except (KeyError, TypeError, ValueError) as exc:
+        return {"error": str(pretty_print_error(exc))}
+
+    return result
 
 def get_critical_service_list():
-    """Returning the response in JSON Format"""
-    try:
-        services = get_configmap(cm_name, cm_namespace, cm_key).get("critical-services", {})
-        return jsonify({"critical-services": get_critical_services(services)})
-    except Exception as e:
-        return {"error": str(pretty_print_error(e))}
+    """
+    Fetch critical services from the ConfigMap and return as a JSON response.
 
+    Returns:
+        Flask Response: JSON response containing critical services or an error message.
+    """
+    try:
+        config_data = get_configmap(CM_NAME, CM_NAMESPACE, CM_KEY)
+        services = config_data.get("critical-services", {})
+        return jsonify({"critical-services": get_critical_services(services)})
+
+    except (KeyError, TypeError, ValueError) as exc:
+        return jsonify({"error": str(pretty_print_error(exc))}), 500

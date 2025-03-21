@@ -21,6 +21,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
+"""Resource to get information about the criticalservices"""
 
 from kubernetes import client
 from flask import json
@@ -60,7 +61,7 @@ def get_namespaced_pods(service_info, service_name):
             pod_status = pod.status.phase
             if pod_status == "Running":
                 running_pods += 1
-            
+
             node_name = pod.spec.node_name
             zone = node_zone_map.get(node_name, "unknown")
 
@@ -75,26 +76,9 @@ def get_namespaced_pods(service_info, service_name):
             })
     return result, running_pods
 
-# def get_namespaced_services(service_info, service_name):
-#     """Fuction to fetch the services in a namespace and number of instances using Kube-config"""
-#     namespace = service_info["namespace"]
-#     v1 = client.CoreV1Api()
-
-#     # Get all services in the namespace and filter by owner reference
-#     svc_list = v1.list_namespaced_service(namespace)
-#     result = [
-#         svc.metadata.name for svc in svc_list.items
-#         if svc.spec.selector and any(
-#             key in svc.spec.selector and svc.spec.selector[key] == service_name
-#             for key in svc.spec.selector
-#         )
-#     ]
-#     return result
-
 def isDeploy(resource_type):
     """To check if resource is Deployment"""
     return "ReplicaSet" if resource_type == "Deployment" else resource_type
-
 
 def get_configmap(cm_name, cm_namespace, cm_key):
     """Fetch the current ConfigMap data from the Kubernetes cluster."""
@@ -106,7 +90,6 @@ def get_configmap(cm_name, cm_namespace, cm_key):
         return {"critical-services": {}}
     except client.exceptions.ApiException as e:
         return {"error": f"Failed to fetch ConfigMap: {e}"}
-
 
 # VOLUME_MOUNT_PATH = "/etc/config"
 # def get_configmap():

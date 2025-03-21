@@ -22,13 +22,17 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
+"""
+Model to fetch and format critical services from a Kubernetes ConfigMap.
+"""
+
 from flask import jsonify
 from resources.critical_services import get_configmap
 from resources.error_print import pretty_print_error
 
-cm_name = "rrs-mon-dynamic"
-cm_namespace = "rack-resiliency"
-cm_key = "critical-service-config.json"
+CM_NAME = "rrs-mon-static"
+CM_NAMESPACE = "rack-resiliency"
+CM_KEY = "critical-service-config.json"
 
 def get_critical_services_status(services):
     """Fetch and format critical services grouped by namespace in the required structure."""
@@ -46,14 +50,21 @@ def get_critical_services_status(services):
             })
 
         return result
+
     except Exception as e:
         return {"error": str(pretty_print_error(e))}
 
 def get_critical_service_list():
-    """Returning the response in JSON Format"""
-    try:
-        services = get_configmap(cm_name, cm_namespace, cm_key).get("critical-services", {})
-        return jsonify({"critical-services": get_critical_services_status(services)})
-    except Exception as e:
-        return {"error": str(pretty_print_error(e))}
+    """
+    Fetch critical services from the ConfigMap and return as a JSON response.
 
+    Returns:
+        Flask Response: JSON response containing critical services or an error message.
+    """
+    try:
+        config_data = get_configmap(CM_NAME, CM_NAMESPACE, CM_KEY)
+        services = config_data.get("critical-services", {})
+        return jsonify({"critical-services": get_critical_services_status(services)})
+
+    except (KeyError, TypeError, ValueError) as exc:
+        return jsonify({"error": str(pretty_print_error(exc))}), 500

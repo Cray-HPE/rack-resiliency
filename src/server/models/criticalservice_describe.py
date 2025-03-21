@@ -21,42 +21,53 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
+"""Model to desribe the criticalservice"""
 
+import logging
 from flask import jsonify
-from resources.critical_services import *
 from kubernetes import client
+from resources.critical_services import get_configmap, get_namespaced_pods
 from resources.error_print import pretty_print_error
+from models.criticalservice_list import CM_KEY, CM_NAME, CM_NAMESPACE
 
-cm_name = "rrs-mon-static"
-cm_namespace = "rack-resiliency"
-cm_key = "critical-service-config.json"
+logging.basicConfig(level=logging.INFO)
+LOGGER = logging.getLogger(__name__)
 
 def get_service_details(services, service_name):
-    """Retrieve details of a specific critical service."""
+    """
+    Retrieve details of a specific critical service.
+
+    Args:
+        services (dict): Dictionary of services from the ConfigMap.
+        service_name (str): Name of the service to retrieve.
+
+    Returns:
+        dict: Service details including name, namespace, type, configured instances,
+              running instances, and pod details.
+    """
     try:
         if service_name not in services:
             return {"error": "Service not found"}
-        
-        # Getting information of service
-        service_info = services[service_name]
-        namespace = service_info["namespace"]
-        resource_type = service_info["type"]
 
-        # Get all pods in the namespace and filter by owner reference
+        service_info = services[service_name]
+        namespace, resource_type = service_info["namespace"], service_info["type"]
         filtered_pods, running_pods = get_namespaced_pods(service_info, service_name)
 
-        # Get configured instances
-        apps_v1 = client.AppsV1Api()
         configured_instances = None
-        if resource_type == "Deployment":
-            deployment = apps_v1.read_namespaced_deployment(service_name, namespace)
-            configured_instances = deployment.spec.replicas
-        elif resource_type == "StatefulSet":
-            statefulset = apps_v1.read_namespaced_stateful_set(service_name, namespace)
-            configured_instances = statefulset.spec.replicas
-        elif resource_type == "DaemonSet":
-            daemonset = apps_v1.read_namespaced_daemon_set(service_name, namespace)
-            configured_instances = daemonset.status.desired_number_scheduled
+        apps_v1 = client.AppsV1Api()
+
+        resource_methods = {
+            "Deployment": apps_v1.read_namespaced_deployment,
+            "StatefulSet": apps_v1.read_namespaced_stateful_set,
+            "DaemonSet": apps_v1.read_namespaced_daemon_set
+        }
+
+        if resource_type in resource_methods:
+            resource = resource_methods[resource_type](service_name, namespace)
+            configured_instances = (
+                resource.spec.replicas if hasattr(resource.spec, "replicas")
+                else resource.status.desired_number_scheduled
+            )
 
         return {
             "Critical Service": {
@@ -64,17 +75,38 @@ def get_service_details(services, service_name):
                 "Namespace": namespace,
                 "Type": resource_type,
                 "Configured Instances": configured_instances,
-                "Currently Running Instances": running_pods, 
-                "Pods": filtered_pods
+                "Currently Running Instances": running_pods,
+                "Pods": filtered_pods,
             }
         }
-    except Exception as e:
-        return {"error": str(pretty_print_error(e))}
+    except client.exceptions.ApiException as api_exc:
+        LOGGER.error("Kubernetes API error: %s", api_exc)
+        return {"error": str(pretty_print_error(api_exc))}
+    except KeyError as key_exc:
+        LOGGER.error("Missing key in service definition: %s", key_exc)
+        return {"error": f"Missing key: {key_exc}"}
+    except (TypeError, ValueError) as parse_exc:
+        LOGGER.error("Parsing error: %s", parse_exc)
+        return {"error": f"Parsing error: {parse_exc}"}
+    except Exception as exc:  # Catch-all, but logs properly
+        LOGGER.error("Unexpected error: %s", exc, exc_info=True)
+        return {"error": str(pretty_print_error(exc))}
 
 def describe_service(service_name):
-    """Returning the response in JSON Format"""
+    """
+    Retrieve service details and return as a JSON response.
+
+    Args:
+        service_name (str): Name of the critical service.
+
+    Returns:
+        JSON: JSON response with service details or error message.
+    """
     try:
-        services = get_configmap(cm_name, cm_namespace, cm_key).get("critical-services", {})
+        services = get_configmap(CM_NAME, CM_NAMESPACE, CM_KEY).get(
+            "critical-services", {}
+        )
         return jsonify(get_service_details(services, service_name))
-    except Exception as e:
-        return {"error": str(pretty_print_error(e))}
+    except Exception as exc:
+        LOGGER.error("Error retrieving service details: %s", exc, exc_info=True)
+        return jsonify({"error": str(pretty_print_error(exc))})
