@@ -1,5 +1,5 @@
 import unittest
-from src.server.models.zoneDescribe import get_zone_info
+from src.server.models.zone_describe import get_zone_info
 from mock_data import MOCK_K8S_RESPONSE, MOCK_ERROR_RESPONSE, MOCK_CEPH_RESPONSE
 
 class TestZoneDescribe(unittest.TestCase):

@@ -1,5 +1,5 @@
 import unittest
-from src.server.models.criticalServiceDescribe import get_service_details
+from src.server.models.criticalservice_describe import get_service_details
 from mock_data import MOCK_ERROR_CRT_SVC, MOCK_CRITICAL_SERVICES_RESPONSE
 
 class TestCriticalServicesDescribe(unittest.TestCase):

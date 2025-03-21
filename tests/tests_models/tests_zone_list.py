@@ -1,5 +1,5 @@
 import unittest
-from src.server.models.zoneList import map_zones
+from src.server.models.zone_list import map_zones
 from mock_data import MOCK_K8S_RESPONSE, MOCK_ERROR_RESPONSE, MOCK_CEPH_RESPONSE
 
 class TestZoneMapping(unittest.TestCase):

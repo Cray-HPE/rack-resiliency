@@ -1,5 +1,5 @@
 import unittest
-from src.server.models.criticalServiceUpdate import update_configmap
+from src.server.models.criticalservice_update import update_configmap
 from mock_data import MOCK_ERROR_CRT_SVC, MOCK_CRITICAL_SERVICES_UPDATE_FILE, MOCK_CRITICAL_SERVICES_RESPONSE, MOCK_ALREADY_EXISTING_FILE
 
 class TestCriticalServicesUpdate(unittest.TestCase):
