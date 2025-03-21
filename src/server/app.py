@@ -28,7 +28,7 @@ from models.zone_describe import describe_zone
 from models.criticalservice_list import get_critical_service_list
 from models.criticalservice_describe import describe_service
 from models.criticalservice_update import update_critical_services
-from models.criticalServiceStatusList import get_critical_services_status
+from models.criticalservice_status_list import get_critical_services_status
 app = Flask(__name__)
 
 # Endpoint to get the list of zones
