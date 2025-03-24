@@ -1,3 +1,4 @@
+"""Python file to store the mocke responses for testing"""
 # Since error response will be a string and it won't be parsed in json so this error will come.
 MOCK_ERROR_CRT_SVC = {"error": "string indices must be integers"} # since func only read json
 
