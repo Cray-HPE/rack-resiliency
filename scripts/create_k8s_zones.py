@@ -22,8 +22,6 @@ def get_k8s_zone_prefix():
     with open(output_file, "w") as f:
         f.write(decoded_yaml)
 
-    print(f"Decoded YAML saved to {output_file}")
-
     # Define the key path
     k8s_key_path = "spec.kubernetes.services.k8s_zone_prefix"
 

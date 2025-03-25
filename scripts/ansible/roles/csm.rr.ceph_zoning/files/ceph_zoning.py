@@ -31,6 +31,7 @@ import subprocess
 import re
 import sys
 import logging
+import base64
 
 # Set up logger
 logger = logging.getLogger("CephZoning")
@@ -41,11 +42,42 @@ formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
+def get_ceph_zone_prefix():
+    # Run kubectl command and capture JSON output
+    namespace = "loftsman"
+    secret_name = "site-init"
+
+    kubectl_cmd = ["kubectl", "-n", namespace, "get", "secret", secret_name, "-o", "json"]
+    kubectl_output = subprocess.run(kubectl_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, check=True)
+
+    # Parse JSON output
+    secret_data = json.loads(kubectl_output.stdout)
+
+    # Extract and decode the base64 data
+    encoded_yaml = secret_data["data"]["customizations.yaml"]
+    decoded_yaml = base64.b64decode(encoded_yaml).decode("utf-8")
+
+    # Write the yaml output to a file
+    output_file = "/tmp/customizations.yaml"
+    with open(output_file, "w") as f:
+        f.write(decoded_yaml)
+
+    # Define the key path
+    ceph_key_path = "spec.kubernetes.services.ceph_zone_prefix"
+
+    # Run yq command to extract the value
+    ceph_yq_cmd = ["yq", "r", output_file, ceph_key_path]
+    ceph_zone = subprocess.run(ceph_yq_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, check=True)
+
+    # Extract and clean the output
+    ceph_zone_prefix = ceph_zone.stdout.strip()
+    return ceph_zone_prefix
+
 def run_command(command):
     """Helper function to run a command and return the result."""
     logger.info(f"Running command: {command}")
     try:
-        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, shell=True)
+        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, shell=True, check=True)
     except subprocess.CalledProcessError as e:
         raise ValueError(f"Command {command} errored out with : {e.stderr}")
     return result.stdout
@@ -53,7 +85,11 @@ def run_command(command):
 def create_and_map_racks(positions_dict):
     sn_count_in_rack = []
     
-    for rack, nodes in positions_dict.items():    
+    for rack, nodes in positions_dict.items():
+        # Updating the rack or zone prefix
+        ceph_zone_prefix = get_ceph_zone_prefix()
+        if ceph_zone_prefix:
+            rack = ceph_zone_prefix + "-" + rack
         # Create buckets for racks
         logger.info(f"Creating bucket for rack: {rack}")
         run_command(f"ceph osd crush add-bucket {rack} rack")
