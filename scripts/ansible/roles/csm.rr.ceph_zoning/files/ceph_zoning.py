@@ -32,6 +32,7 @@ import re
 import sys
 import logging
 import base64
+import os
 
 # Set up logger
 logger = logging.getLogger("CephZoning")
@@ -152,13 +153,16 @@ def service_zoning(positions_dict, sn_count_in_rack):
         logger.info(f"Applying {service} service on nodes {nodes_output}")
         run_command(f"ceph orch apply {service} --placement=\"" + str(nodes_count) + " " + nodes_output + "\"")
 
-    # Configurations
-    logger.info("Generating minimal configuration and copying updated ceph.conf")
     run_command("sleep 30")
-    run_command("ceph config generate-minimal-conf > /etc/ceph/ceph_conf_min")
-    run_command("cp /etc/ceph/ceph_conf_min /etc/ceph/ceph.conf")
-    run_command("for host in $(ceph node ls| jq -r '.osd|keys[]'); do scp /etc/ceph/ceph.conf $host:/etc/ceph; done")
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    shell_script = os.path.join(script_dir, "ceph_haproxy.sh")
+    process = subprocess.Popen([shell_script], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, bufsize=1)
     
+    # To capture and display output from the ceph_haproxy.sh script
+    for line in process.stdout:
+        logger.debug(line.strip())
+    exit_code = process.wait()
+    logger.debug(f"ceph_haproxy.sh exited with code {exit_code}")
 
 def main():
     if len(sys.argv) != 2:
