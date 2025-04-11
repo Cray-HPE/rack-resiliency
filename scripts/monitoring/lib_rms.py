@@ -29,6 +29,24 @@ def run_command(command):
         raise ValueError(f"Command {command} errored out with : {e.stderr}")
     return result.stdout
 
+def get_current_node():
+    pod_name = os.getenv("HOSTNAME")
+    pod = v1.read_namespaced_pod(name=pod_name, namespace='rack-resiliency')
+    node_name = pod.spec.nodeName   #node_name if nodeName does not work    
+    return node_name
+
+def getNodeMonitorGracePeriod():
+    # Get the kube-controller-manager pod which would be having nodeMonitorGracePeriod if configured
+    pods = v1.list_namespaced_pod(namespace="kube-system", label_selector="component=kube-controller-manager")
+    if pods.items:
+        command = pods.items[0].spec.containers[0].command
+        grace_period_flag = next((arg for arg in command if "--node-monitor-grace-period" in arg), None)
+        if grace_period_flag:
+            nodeMonitorGracePeriod = grace_period_flag.split("=")[1]
+            return int(nodeMonitorGracePeriod.rstrip("s"))
+    else:
+        logger.error("kube-controller-manager pod not found")
+    return None    
 
 def ceph_health_check():
     
@@ -136,7 +154,6 @@ def get_ceph_status():
     
     ceph_healthy = ceph_health_check()
     
-    #print(final_output)
     return final_output, ceph_healthy
 
 

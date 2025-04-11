@@ -31,7 +31,7 @@ import logging
 from datetime import datetime
 from flask import Flask, request, jsonify
 from kubernetes import client, config
-from concurrent.futures import ThreadPoolExecutor
+#from concurrent.futures import ThreadPoolExecutor
 import requests
 import sys
 import base64
@@ -52,29 +52,77 @@ logging.basicConfig(
 )
 logger = logging.getLogger()
 
-executor = ThreadPoolExecutor(max_workers=10)
+#executor = ThreadPoolExecutor(max_workers=10)
 # Global Lock for monitor_critical_services
-monitor_lock = threading.Lock()
-is_monitor_running = False           
+#monitor_lock = threading.Lock()
+#is_monitor_running = False           
+#dynamic_cm = 'rrs-mon-dynamic'
+#static_cm = 'rrs-mon-static'
+#global_rms_state = ''
+#global_dynamic_data = dict()
+
+
 namespace = 'rack-resiliency'
-#dynamic_cm = 'dynamic-sravani-test'
-#static_cm = 'static-sravani-test'
-dynamic_cm = 'rrs-mon-dynamic'
-static_cm = 'rrs-mon-static'
+dynamic_cm = 'dynamic-sravani-test'
+static_cm = 'static-sravani-test'
+
+
+
+class RMSStateManager:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.monitor_running = False
+        self.rms_state = ""
+        self.dynamic_cm_data = {}
+
+    def set_state(self, new_state):
+        with self.lock:
+            self.rms_state = new_state
+
+    def get_state(self):
+        with self.lock:
+            return self.rms_state
+
+    def set_dynamic_cm_data(self, data):
+        with self.lock:
+            self.dynamic_cm_data = data
+
+    def get_dynamic_cm_data(self):
+        with self.lock:
+            if not self.dynamic_cm_data:
+                self.dynamic_cm_data = lib_configmap.get_configmap(namespace, dynamic_cm)
+            return self.dynamic_cm_data
+
+    def is_monitoring(self):
+        with self.lock:
+            return self.monitor_running
+
+    def start_monitoring(self):
+        with self.lock:
+            if self.monitor_running:
+                return False
+            self.monitor_running = True
+            return True
+
+    def stop_monitoring(self):
+        with self.lock:
+            self.monitor_running = False
+
+
+state_manager = RMSStateManager()
+
 
 def update_zone_status():
     logger.info("Getting latest status for zones and nodes")
-    dynamic_cm_data = lib_configmap.get_configmap(namespace, dynamic_cm)
-    
     try:
+        dynamic_cm_data = state_manager.get_dynamic_cm_data()
         yaml_content = dynamic_cm_data.get('dynamic-data.yaml', None)
-        #print(yaml_content)
         if yaml_content:
             dynamic_data = yaml.safe_load(yaml_content)    
         else:
             logger.error("No content found under dynamic-data.yaml in rrs-mon-dynamic configmap")
-            exit(1)
-        
+            #exit(1)
+
         zone_info = dynamic_data.get('zone')
         k8s_info = zone_info.get('k8s_zones_with_nodes')
         k8s_info_old = copy.deepcopy(k8s_info)
@@ -91,24 +139,30 @@ def update_zone_status():
 
         if k8s_info_old != k8s_info or ceph_info_old != updated_ceph_data:
             logger.info(f"Updating zone information in rrs-dynamic configmap")
-            lib_configmap.update_configmap_data(namespace, dynamic_cm, dynamic_cm_data, 'dynamic-data.yaml', yaml.dump(dynamic_data, default_flow_style=False))        
-        return k8s_info, updated_ceph_data, ceph_healthy_status
+
+            dynamic_cm_data['dynamic-data.yaml'] = yaml.dump(dynamic_data, default_flow_style=False)
+            state_manager.set_dynamic_cm_data(dynamic_cm_data)
+            lib_configmap.update_configmap_data(namespace, dynamic_cm, dynamic_cm_data,'dynamic-data.yaml', dynamic_cm_data['dynamic-data.yaml'])        
+        #return k8s_info, updated_ceph_data, ceph_healthy_status
+        return ceph_healthy_status
 
     except KeyError as e:
         logger.error(f"Key error occurred: {e}")
         logger.error("Ensure that 'zone' and 'k8s_zones_with_nodes' keys are present in the dynamic configmap data.")
+        state_manager.set_state("internal_failure")
     except yaml.YAMLError as e:
         logger.error(f"YAML error occurred: {e}")
+        state_manager.set_state("internal_failure")
     except Exception as e:
         logger.error(f"An unexpected error occurred: {e}")
+        state_manager.set_state("internal_failure")
 
 
-def update_critical_services(reloading=False):
-    static_cm_data = lib_configmap.get_configmap(namespace, static_cm)
-    dynamic_cm_data = lib_configmap.get_configmap(namespace, dynamic_cm)
-    
+def update_critical_services(reloading=False):      
     try:
+        dynamic_cm_data = state_manager.get_dynamic_cm_data()
         if reloading:
+            static_cm_data = lib_configmap.get_configmap(namespace, static_cm)
             logger.info('Retrieving critical services information from rrs-static configmap')
             json_content = static_cm_data.get('critical-service-config.json', None)
         else:
@@ -121,60 +175,101 @@ def update_critical_services(reloading=False):
             exit(1)
 
         updated_services = lib_rms.get_critical_services_status(services_data)
-        #print(updated_services)
         services_json = json.dumps(updated_services, indent=2)
-        print(services_json)
+        logger.info(services_json)
         if services_json != dynamic_cm_data.get('critical-service-config.json', None):
             logger.debug('critical services are modified. Updating dynamic configmap with latest information')
-            lib_configmap.update_configmap_data(namespace, dynamic_cm, dynamic_cm_data, 'critical-service-config.json', services_json)
+            dynamic_cm_data['critical-service-config.json'] = services_json
+            state_manager.set_dynamic_cm_data(dynamic_cm_data)        
+            lib_configmap.update_configmap_data(namespace, dynamic_cm, dynamic_cm_data,'critical-service-config.json', services_json)
         return services_json
     except json.JSONDecodeError:
         logger.error("Failed to decode critical-service-config.json from configmap")
+        state_manager.set_state("internal_failure")
         return
     except KeyError as e:
         logger.error(f"KeyError occurred: {str(e)} - Check if the configmap contains the expected keys")
+        state_manager.set_state("internal_failure")
     except Exception as e:
         logger.error(f"An unexpected error occurred: {str(e)}")
+        state_manager.set_state("internal_failure")
     
-
-
-def monitoring_loop():
-    """Initiate monitoring critical services and CEPH"""
-    global is_monitor_running
-    with monitor_lock:
-        if is_monitor_running:
-            logger.error(f"Thread {threading.current_thread().name} cannot run monitoring because it's already running")
-            return  # Return early if the function is already running
-        is_monitor_running = True 
-
-    logger.info('Monitoring critical services and zone status...')
-    
-    # Read the 'rrs-mon' configmap and parse the data
-    static_cm_data = lib_configmap.get_configmap(namespace, static_cm)
-    monitoring_timeout = static_cm_data.get('monitoring-timeout', 300)  # Default 15 minutes if not found
-    timer = 0
-    while timer < monitoring_timeout:
+def monitor_k8s(polling_interval, total_time, pre_delay):
+    logger.info("Starting k8s monitoring")
+    update_state_timestamp('k8s_monitoring', 'Started', 'start_timestamp_k8s_monitoring')
+    nodeMonitorGracePeriod = lib_rms.getNodeMonitorGracePeriod()
+    if nodeMonitorGracePeriod:
+        time.sleep(nodeMonitorGracePeriod)
+    else:
+        time.sleep(pre_delay)
+    start = time.time()
+    while time.time() - start < total_time:
         #Retrieve and update critical services status 
         latest_services_json = update_critical_services()
-        #Retrieve and update k8s/CEPH status and CEPH health
-        latest_k8_info, latest_ceph_info, ceph_healthy_status = update_zone_status()
+        time.sleep(polling_interval)
 
-        timer += 60
-        time.sleep(60)  # Sleep for 60 seconds before checking again
-
-    logger.info(f"Ending the monitoring loop after {monitoring_timeout} seconds")
+    logger.info(f"Ending the k8s monitoring loop after {total_time} seconds")
+    update_state_timestamp('k8s_monitoring', 'Completed', 'end_timestamp_k8s_monitoring')
     unrecovered_services = []
     for service, details in json.loads(latest_services_json)["critical-services"].items():
         if details["status"] == "PartiallyConfigured" or details["balanced"] == "false":
             unrecovered_services.append(service)
     if unrecovered_services:
         logger.error(f"Services {unrecovered_services} are still not recovered even after {monitoring_timeout} seconds")
+    
 
+def monitor_ceph(polling_interval, total_time, pre_delay):
+    logger.info("Starting CEPH monitoring")
+    update_state_timestamp('ceph_monitoring', 'Started', 'start_timestamp_ceph_monitoring')
+    time.sleep(pre_delay)
+    start = time.time()
+    while time.time() - start < total_time:
+        #Retrieve and update k8s/CEPH status and CEPH health
+        fceph_healthy_status = update_zone_status()
+        time.sleep(polling_interval)
+    
+    update_state_timestamp('ceph_monitoring', 'Completed', 'end_timestamp_ceph_monitoring')
     if ceph_healthy_status == False:
-        logger.error(f"CEPH is still not healthy even after {monitoring_timeout} seconds")
+        logger.error(f"CEPH is still unhealthy after {total_time} seconds")
 
-    with monitor_lock:
-        is_monitor_running = False  # Reset the flag when the function is done
+def monitoring_loop():
+    """Initiate monitoring critical services and CEPH"""
+    if not state_manager.start_monitoring():
+        logger.warn(f"Skipping launch of a new monitoring instance as a previous one is still active")
+        return  # Return early if the function is already running
+    
+    logger.info('Monitoring critical services and zone status...')
+    state = 'Monitoring'
+    state_manager.set_state(state)
+    update_state_timestamp('rms_state', state)
+    # Read the 'rrs-mon' configmap and parse the data
+    static_cm_data = lib_configmap.get_configmap(namespace, static_cm)
+
+    k8s_args = (
+        int(static_cm_data.get('k8s_monitoring_polling_interval', 60)),
+        int(static_cm_data.get('k8s_monitoring_total_time', 600)),
+        int(static_cm_data.get('k8s_pre_monitoring_delay', 40))
+    )
+    
+    ceph_args = (
+        int(static_cm_data.get('ceph_monitoring_polling_interval', 60)),
+        int(static_cm_data.get('ceph_monitoring_total_time', 600)),
+        int(static_cm_data.get('ceph_pre_monitoring_delay', 40))
+    )
+
+    t1 = threading.Thread(target=monitor_k8s, args=k8s_args)
+    t2 = threading.Thread(target=monitor_ceph, args=ceph_args)
+
+    t1.start()
+    t2.start()
+
+    t1.join()
+    t2.join()
+
+    logger.info("Monitoring complete")
+    state_manager.stop_monitoring()
+    state_manager.set_state("Started")
+    update_state_timestamp('rms_state', 'Started')
 
 
 def token_fetch():
@@ -196,13 +291,16 @@ def token_fetch():
         
     except requests.exceptions.RequestException as e:
         logger.error(f"Request failed: {e}")
-        exit(1)
+        state_manager.set_state("internal_failure")
+        #exit(1)
     except ValueError as e:
         logger.error(f"Failed to parse JSON: {e}")
-        exit(1)
+        state_manager.set_state("internal_failure")
+        #exit(1)
     except Exception as err:
         logger.error("Error collecting secret from Kubernetes: {}".format(err))
-        exit(1)
+        state_manager.set_state("internal_failure")
+        #exit(1)
     
                 
         
@@ -216,7 +314,7 @@ def check_failure_type(component_xname):
     headers = {
         "Authorization": f"Bearer {token}",
         "Accept": "application/json"
-    }    
+    }
     try:
         # Make the GET request to hsm endpoint
         hsm_response = requests.get(hsm_url, headers=headers)
@@ -252,19 +350,34 @@ def check_failure_type(component_xname):
         else:
             logger.info("Not all the components present in the rack are down. It is only a NODE FAILURE")
 
+        dynamic_cm_data = state_manager.get_dynamic_cm_data()
+        yaml_content = dynamic_cm_data.get('dynamic-data.yaml', None)
+        if yaml_content:
+            dynamic_data = yaml.safe_load(yaml_content)    
+        else:
+            logger.error("No content found under dynamic-data.yaml in rrs-mon-dynamic configmap")
+        pod_zone = dynamic_data.get('rrs').get('zone')
+        pod_node = dynamic_data.get('rrs').get('node')
+        if rack_id in pod_zone:
+            print("Monitoring pod was on the failed rack")
+        #implement this            
+
     except requests.exceptions.RequestException as e:
         logger.error(f"Request failed: {e}")
-        exit(1)
+        state_manager.set_state("internal_failure")
+        #exit(1)
     except ValueError as e:
         logger.error(f"Failed to parse JSON: {e}")
-        exit(1)
+        state_manager.set_state("internal_failure")
+        #exit(1)
 
 
 @app.route("/scn", methods=["POST"])
 def handleSCN():
     """Handle incoming POST requests and initiate monitoring"""
-    logger.info("POST call received from HMNFD")
-
+    logger.info("Notification received from HMNFD")
+    #global_rms_state = "Fail_notified"
+    state_manager.set_state("Fail_notified")
     # Get JSON data from request
     try:
         notification_json = request.get_json()
@@ -278,22 +391,17 @@ def handleSCN():
             logger.error("Missing 'Components' or 'State' in the request")
             return jsonify({"error": "Missing 'Components' or 'State' in the request"}), 400
 
-        # Process the state
         if state == 'Off':
             for component in components:
                 logger.info(f'Node {component} is turned Off')
             # Start monitoring services in a new thread
-            #print(f"Number of active threads are: {threading.active_count()}")
-            
             check_failure_type(component)
             threading.Thread(target=monitoring_loop).start()
-
-            #logger.info(f"Thread {threading.current_thread().name} has ended")
                 
         elif state == 'On':
-            #print(f"Number of active threads are: {threading.active_count()}")
             for component in components:
                 logger.info(f'Node {component} is turned On')
+            # Handle discovery of nodes
             # Handle cleanup or other actions here if needed
 
         else:
@@ -303,6 +411,7 @@ def handleSCN():
 
     except Exception as e:
         logger.error("Error processing the request: %s", e)
+        state_manager.set_state("internal_failure")
         return jsonify({"error": "Internal server error."}), 500
 
 
@@ -335,11 +444,13 @@ def get_management_xnames():
         return list(management_xnames)
         
     except requests.exceptions.RequestException as e:
-        print(f"Request failed: {e}")
-        exit(1)
+        logger.error(f"Request failed: {e}")
+        state_manager.set_state("internal_failure")
+        #exit(1)
     except ValueError as e:
-        print(f"Failed to parse JSON: {e}")
-        exit(1)
+        logger.error(f"Failed to parse JSON: {e}")
+        state_manager.set_state("internal_failure")
+        #exit(1)
 
 
 def check_and_create_hmnfd_subscription(node_ip = ''):
@@ -358,13 +469,13 @@ def check_and_create_hmnfd_subscription(node_ip = ''):
     post_url = f"https://api-gw-service-nmn.local/apis/hmnfd/hmi/v2/subscriptions/{subscriber_node}/agents/{agent_name}"
 
     subscribing_components = get_management_xnames()
-    #print(subscribing_components)
     post_data = {
         "Components": subscribing_components,
         "Roles": ["Management"],
         "States": ["Ready","on","off","empty","unknown","populated"],
         "Url": "http://10.102.193.27:3000/scn"
-    } 
+        #"Url": "https://api-gw-service-nmn.local/apis/rms/scn"
+    }
     headers = {
         "Authorization": f"Bearer {token}",        
         "Accept": "application/json"
@@ -372,31 +483,29 @@ def check_and_create_hmnfd_subscription(node_ip = ''):
 
     try:
         get_response = requests.get(get_url, headers=headers)
-        #print("Done with get request")
         data = get_response.json()
         exists = any("rms" in subscription['Subscriber'] for subscription in data['SubscriptionList'])
 
         if not exists:
             logger.info(f"rms not present in the HMNFD subscription list, creating it ...")
-            #print(post_data)
             post_response = requests.post(post_url, json=post_data, headers=headers)
             post_response.raise_for_status()
             logger.info(f"Successfully subscribed to hmnfd for SCN notifications")
-            #logger.info(f"Response data: {post_response.json()}")
         else:
             logger.info(f"rms is already present in the subscription list")
     except requests.exceptions.RequestException as e:
         # Handle request errors (e.g., network issues, timeouts, non-2xx status codes)
         logger.error(f"Failed to make subscription request to hmnfd. Error: {e}")
-        #print(f"Response content: {post_response.content}")
+        state_manager.set_state("internal_failure")
         #exit(1)
     except ValueError as e:
         # Handle JSON parsing errors
         logger.error(f"Failed to parse JSON response: {e}")
+        state_manager.set_state("internal_failure")
         #exit(1)
 
 def initial_check_and_update():
-     
+    launch_monitoring = False
     dynamic_cm_data = lib_configmap.get_configmap(namespace, dynamic_cm)   
     try:
         yaml_content = dynamic_cm_data.get('dynamic-data.yaml', None)
@@ -406,24 +515,44 @@ def initial_check_and_update():
             logger.error("No content found under dynamic-data.yaml in rrs-mon-dynamic configmap")
             exit(1)
 
+        state = dynamic_data.get('state', {})
+        rms_state = state.get('rms_state', None)
+        if rms_state != "Ready":
+            logger.info(f"RMS state is {rms_state}")
+            if rms_state == "Monitoring":
+                launch_monitoring = True
+            elif rms_state == "Init_fail":
+                logger.error("RMS is in 'init_fail' state indicating init container failed — not starting the RMS service")
+                exit(1)
+            else:
+                logger.info("Updating RMS state to Ready for this fresh run")
+                rms_state = "Ready"
+                state['rms_state'] = rms_state
+                state_manager.set_state(rms_state)
         #Update RMS start timestamp in dynamic configmap
         timestamps = dynamic_data.get('timestamps', {})
         rms_start_timestamp = timestamps.get('start_timestamp_rms', None)
-        if not rms_start_timestamp:
-            timestamps['start_timestamp_rms'] = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
-            lib_configmap.update_configmap_data(namespace, dynamic_cm, dynamic_cm_data, 'dynamic-data.yaml', yaml.dump(dynamic_data, default_flow_style=False))
-            logger.debug(f"Updated rms_start_timestamp in rrs-dynamic configmap")
-        else:
+        if rms_start_timestamp:
             logger.debug("RMS start time already present in configmap")
             logger.info(f"Rack Resiliency Monitoring Service is restarted because of a failure")  
+        timestamps['start_timestamp_rms'] = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
+        
+        dynamic_cm_data['dynamic-data.yaml'] = yaml.dump(dynamic_data, default_flow_style=False)
+        state_manager.set_dynamic_cm_data(dynamic_cm_data)
+        lib_configmap.update_configmap_data(namespace, dynamic_cm, dynamic_cm_data,'dynamic-data.yaml', dynamic_cm_data['dynamic-data.yaml'])  
+        logger.debug(f"Updated rms_start_timestamp in rrs-dynamic configmap")
 
     except ValueError as e:
         logger.error(f"Error during configuration check and update: {e}")
-        exit(1)
+        state_manager.set_state("internal_failure")
+        #exit(1)
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
-        exit(1)
-        
+        state_manager.set_state("internal_failure")
+        #exit(1)
+    if launch_monitoring:
+        return True
+    return False    
 
 def run_flask():
     """Run the Flask app in a separate thread for listening to HMNFD notifications"""
@@ -434,19 +563,58 @@ def run_flask():
         #node_ip = subprocess.check_output(["hostname", "-i"]).decode("utf-8").strip()
     app.run(host="0.0.0.0", port=3000, threaded=True, debug=False, use_reloader=False)
 
-    
+def update_state_timestamp(state_field = 'None', new_state = 'None', timestamp_field = 'None'):
+    try:
+        dynamic_cm_data = state_manager.get_dynamic_cm_data()
+        yaml_content = dynamic_cm_data.get('dynamic-data.yaml', None)
+        if yaml_content:
+            dynamic_data = yaml.safe_load(yaml_content)    
+        else:
+            logger.error("No content found under dynamic-data.yaml in rrs-mon-dynamic configmap")
+        if new_state:
+            logger.info(f"Updating state {state_field} to {new_state}")
+            state = dynamic_data.get('state', {})   
+            state[state_field] = new_state
+        if timestamp_field:
+            logger.info(f"Updating timestamp {timestamp_field}")
+            timestamp = dynamic_data.get('timestamps', {})   
+            timestamp[timestamp_field] = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
+        
+        dynamic_cm_data['dynamic-data.yaml'] = yaml.dump(dynamic_data, default_flow_style=False)
+        state_manager.set_dynamic_cm_data(dynamic_cm_data)
+        lib_configmap.update_configmap_data(namespace, dynamic_cm, dynamic_cm_data,'dynamic-data.yaml', dynamic_cm_data['dynamic-data.yaml'])  
+        #logger.info(f"Updated rms_state in rrs-dynamic configmap from {rms_state} to {new_state}")
+    except ValueError as e:
+        logger.error(f"Error during configuration check and update: {e}")
+        state_manager.set_state("internal_failure")
+        #exit(1)
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        state_manager.set_state("internal_failure")
+        #exit(1)
 
-if __name__ == "__main__":
-  
-    initial_check_and_update()
+if __name__ == "__main__": 
+    launch_monitoring = initial_check_and_update()    
     flask_thread = threading.Thread(target=run_flask)
     flask_thread.start()
-    time.sleep(1)
-
+    check_and_create_hmnfd_subscription()
+    update_critical_services(True)
+    update_zone_status()
+    if launch_monitoring:
+        logger.info("RMS is in 'Monitoring' state - starting monitoring loop to resume previous incomplete process")
+        threading.Thread(target=monitoring_loop).start()
+    time.sleep(600)
     while True:
+        #global_rms_state = "Started"
+        state = 'Started'
+        state_manager.set_state(state)
+        update_state_timestamp('rms_state', state)
         logger.info("starting the loop")
         check_and_create_hmnfd_subscription()
         update_critical_services(True)
         update_zone_status()
         #break
+        state = 'Waiting'
+        state_manager.set_state(state)
+        update_state_timestamp('rms_state', state)
         time.sleep(300)  #update it to 600 after demo

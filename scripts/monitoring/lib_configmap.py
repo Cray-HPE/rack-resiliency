@@ -32,7 +32,7 @@ def acquire_lock(namespace, configmap_name):
         configmap_lock_name = configmap_name + "-lock"
         try:
             config_map = v1.read_namespaced_config_map(namespace=namespace, name=configmap_lock_name)
-            print(config_map)
+            #print(config_map)
             logger.info("Lock is already acquired by some other resource. Retrying in 1 second...")
             time.sleep(1)
         except client.exceptions.ApiException as e:
@@ -59,9 +59,6 @@ def release_lock(namespace, configmap_name):
 def update_configmap_data(namespace, configmap_name, configmap_data, key, new_data, mount_path=''):
     """Update a ConfigMap both in k8s and inside the pod"""
     
-    #print(f"In update_configmap_data, key is {key} and data is {new_data}")
-    configmap_data[key] = new_data
-    #print(configmap_data)
     configmap_body = client.V1ConfigMap(
         metadata=client.V1ObjectMeta(name=configmap_name),
         data=configmap_data
@@ -71,7 +68,7 @@ def update_configmap_data(namespace, configmap_name, configmap_data, key, new_da
         try:
             #print("updating the configmap")
             v1.replace_namespaced_config_map(name=configmap_name, namespace=namespace, body=configmap_body)
-            logger.info(f"ConfigMap '{configmap_name}' in namespace '{namespace}' updated successfully")
+            logger.debug(f"ConfigMap '{configmap_name}' in namespace '{namespace}' updated successfully")
             
             if mount_path:
                 #Update mounted configmap volume from environment value
@@ -79,7 +76,8 @@ def update_configmap_data(namespace, configmap_name, configmap_data, key, new_da
                 with open(file_path, 'w') as f:
                     f.write(new_data)          
                 logger.debug(f"Mounted file {file_path} updated successfully inside the pod")
-
+        except Exception as e:
+            logger.error(f"Failed to update ConfigMap or mounted file: {str(e)}")
         finally:
             release_lock(namespace, configmap_name)
             
