@@ -9,6 +9,7 @@ metadata:
 data:
   dynamic-data.yaml: |-
     timestamps:
+      init_timestamp: ""
       start_timestamp_rms: "" 
       start_timestamp_api: ""
       last_update_timestamp: ""
